@@ -32,8 +32,15 @@ import {
   renderPersona,
 } from './store.js'
 
+import {
+  CARD_AUTHORING_SKILL_NAME,
+  CARD_AUTHORING_SKILL_DESCRIPTION,
+  CARD_AUTHORING_SKILL_WHEN_TO_USE,
+  CARD_AUTHORING_SKILL_CONTENT,
+} from './skill.js'
+
 export const name = 'cosplay-core'
-export const inject = ['settings', 'systemPrompt', 'tools', 'typert']
+export const inject = ['settings', 'systemPrompt', 'tools', 'typert', 'skills']
 
 const RoleCardSchema = z.object({
   id: z.string().required(),
@@ -254,6 +261,14 @@ export function apply(ctx) {
     name: PERSONA_SECTION_ADDON,
     order: PERSONA_ORDER + 1,
     text: '{{cosplay_active}}',
+  })
+
+  // ── 内置 skill：自然语言创建角色卡（全局注册，模型可加载） ───────────────
+  ctx.skills.register({
+    name: CARD_AUTHORING_SKILL_NAME,
+    description: CARD_AUTHORING_SKILL_DESCRIPTION,
+    whenToUse: CARD_AUTHORING_SKILL_WHEN_TO_USE,
+    content: CARD_AUTHORING_SKILL_CONTENT,
   })
 
   // ── 全局工具（模式门控：开关关闭时 switch 软禁用） ────────────────────────
