@@ -50,6 +50,7 @@ window.__ModuleLoader__.load({
       { id: 'dsh-cosplay#cosplay/removeRole', service: 'cosplay', namespace: 'cosplay', method: 'removeRole', invocation: { kind: 'direct' }, parameters: [{ name: 'id', wire: 'id', source: 'json', codec: strictCodec('dsh-cosplay#RoleId') }], result: strictCodec('dsh-cosplay#CosplayState') },
       { id: 'dsh-cosplay#cosplay/setActiveRole', service: 'cosplay', namespace: 'cosplay', method: 'setActiveRole', invocation: { kind: 'direct' }, parameters: [{ name: 'id', wire: 'id', source: 'json', codec: strictCodec('dsh-cosplay#RoleId') }], result: strictCodec('dsh-cosplay#CosplayState') },
       { id: 'dsh-cosplay#cosplay/setEnabled', service: 'cosplay', namespace: 'cosplay', method: 'setEnabled', invocation: { kind: 'direct' }, parameters: [{ name: 'enabled', wire: 'enabled', source: 'json', codec: strictCodec('dsh-cosplay#Enabled') }], result: strictCodec('dsh-cosplay#CosplayState') },
+      { id: 'dsh-cosplay#cosplay/setThinkingStyle', service: 'cosplay', namespace: 'cosplay', method: 'setThinkingStyle', invocation: { kind: 'direct' }, parameters: [{ name: 'style', wire: 'style', source: 'json', codec: strictCodec('dsh-cosplay#ThinkingStyle') }], result: strictCodec('dsh-cosplay#CosplayState') },
     ]
     const COSPLAY_REMOTE = { package: 'dsh-cosplay', descriptors: COSPLAY_INVOCATIONS }
 
@@ -190,6 +191,14 @@ window.__ModuleLoader__.load({
         }
       }, [store, value, reportError])
 
+      const setThinkingStyle = useCallback(async (style) => {
+        try {
+          await store.mutate((r) => r.setThinkingStyle(style))
+        } catch (error) {
+          reportError(error)
+        }
+      }, [store, reportError])
+
       if (snapshot.status === 'loading') {
         return React.createElement('div', { style: styles.hint }, '角色扮演设置加载中…')
       }
@@ -202,6 +211,7 @@ window.__ModuleLoader__.load({
       }
 
       const enabled = value?.enabled === true
+      const thinkingStyle = value?.thinkingStyle ?? 'neutral'
       const roles = value?.roles ?? []
       const activeRole = value?.activeRole ?? null
 
@@ -243,6 +253,29 @@ window.__ModuleLoader__.load({
                 ? `当前扮演：${roles.find((r) => r.id === activeRole)?.name ?? activeRole}`
                 : '已开启但未选择角色 —— 请在下方的角色列表中「设为当前」。'
               : '默认关闭：开启后才生效（opt-in）。',
+          ),
+          // ── 思考风格（全局） ──
+          React.createElement(
+            'div',
+            { style: styles.row },
+            React.createElement('span', { style: styles.label }, '思考风格'),
+            React.createElement(
+              'button',
+              { style: { ...styles.button, ...(thinkingStyle !== 'role' ? { borderColor: 'var(--dsw-specific-accent, #4d6bfe)' } : {}) }, onClick: () => setThinkingStyle('neutral') },
+              '中立思考',
+            ),
+            React.createElement(
+              'button',
+              { style: { ...styles.button, ...(thinkingStyle === 'role' ? { borderColor: 'var(--dsw-specific-accent, #4d6bfe)' } : {}) }, onClick: () => setThinkingStyle('role') },
+              '角色化思考',
+            ),
+          ),
+          React.createElement(
+            'div',
+            { style: styles.hint },
+            thinkingStyle !== 'role'
+              ? '中立思考：模型思考过程保持专业分析，仅最终回复扮演角色（推荐，保障 Agent 工作能力）。'
+              : '角色化思考：模型的思考过程也保持角色人设与口吻（全沉浸；笨角色可能影响任务能力）。',
           ),
         ),
         // ── 角色列表 ──

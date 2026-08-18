@@ -16,13 +16,17 @@ import {
   roleSummary,
 } from '../src/store.js'
 
-test('normalizeState 规整任意输入（含 enabled）', () => {
+test('normalizeState 规整任意输入（含 enabled / thinkingStyle）', () => {
   assert.deepEqual(normalizeState(undefined), EMPTY_STATE)
   assert.deepEqual(normalizeState(null), EMPTY_STATE)
   assert.equal(normalizeState({ enabled: true }).enabled, true)
   assert.equal(normalizeState({ enabled: 'yes' }).enabled, false) // 非布尔视为关
+  assert.equal(normalizeState({}).thinkingStyle, 'neutral') // 默认 neutral
+  assert.equal(normalizeState({ thinkingStyle: 'role' }).thinkingStyle, 'role')
+  assert.equal(normalizeState({ thinkingStyle: 'banana' }).thinkingStyle, 'neutral') // 非法值回退
   assert.deepEqual(normalizeState({ roles: [{ id: 'a', name: 'A' }] }), {
     enabled: false,
+    thinkingStyle: 'neutral',
     activeRole: null,
     roles: [{ id: 'a', name: 'A' }],
   })
@@ -92,9 +96,15 @@ test('renderPersona / renderActivePersona（开关门控）', () => {
   const onNoRole = { ...EMPTY_STATE, enabled: true }
   assert.ok(renderActivePersona(onNoRole).includes('未选择角色'))
 
-  // 开启 + 激活角色：角色卡
+  // 开启 + 激活角色：角色卡 + 思考风格指令（默认 neutral）
   const onActive = { ...offActive, enabled: true }
-  assert.ok(renderActivePersona(onActive).includes('A'))
+  const persona = renderActivePersona(onActive)
+  assert.ok(persona.includes('A'))
+  assert.ok(persona.includes('思考过程保持中立'))
+
+  // 角色化思考
+  const onRoleThinking = { ...onActive, thinkingStyle: 'role' }
+  assert.ok(renderActivePersona(onRoleThinking).includes('思考过程同样保持角色人设'))
 })
 
 test('roleSummary', () => {

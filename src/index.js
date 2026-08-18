@@ -50,6 +50,7 @@ const RoleCardSchema = z.object({
 // store 层内部仍用 null 语义，写入时序列化为空串。
 const CosplaySettingsSchema = z.object({
   enabled: z.boolean().default(false),
+  thinkingStyle: z.union(['neutral', 'role']).default('neutral'),
   activeRole: z.string().default(''),
   roles: z.array(RoleCardSchema).default([]),
 })
@@ -113,8 +114,12 @@ class CosplayRuntime extends TypertRemoteService {
   async setEnabled(enabled) {
     return this._write({ ...this._read(), enabled: enabled === true })
   }
+  async setThinkingStyle(style) {
+    const next = style === 'role' ? 'role' : 'neutral'
+    return this._write({ ...this._read(), thinkingStyle: next })
+  }
 }
-for (const method of ['getState', 'upsertRole', 'removeRole', 'setActiveRole', 'setEnabled']) {
+for (const method of ['getState', 'upsertRole', 'removeRole', 'setActiveRole', 'setEnabled', 'setThinkingStyle']) {
   markRemoteMethod(CosplayRuntime.prototype, method)
 }
 
@@ -168,6 +173,15 @@ const COSPLAY_INVOCATIONS = [
     parameters: [{ name: 'enabled', wire: 'enabled', source: 'json', codec: strictCodec('dsh-cosplay#Enabled') }],
     result: strictCodec('dsh-cosplay#CosplayState'),
   },
+  {
+    id: 'dsh-cosplay#cosplay/setThinkingStyle',
+    service: 'cosplay',
+    namespace: 'cosplay',
+    method: 'setThinkingStyle',
+    invocation: { kind: 'direct' },
+    parameters: [{ name: 'style', wire: 'style', source: 'json', codec: strictCodec('dsh-cosplay#ThinkingStyle') }],
+    result: strictCodec('dsh-cosplay#CosplayState'),
+  },
 ]
 
 const COSPLAY_MEMBERS = [
@@ -176,6 +190,7 @@ const COSPLAY_MEMBERS = [
   { kind: 'method', name: 'removeRole', signature: 'removeRole(id: string): Promise<CosplayState>' },
   { kind: 'method', name: 'setActiveRole', signature: 'setActiveRole(id: string | null): Promise<CosplayState>' },
   { kind: 'method', name: 'setEnabled', signature: 'setEnabled(enabled: boolean): Promise<CosplayState>' },
+  { kind: 'method', name: 'setThinkingStyle', signature: 'setThinkingStyle(style: "neutral" | "role"): Promise<CosplayState>' },
 ]
 
 const TYPERT_MANIFEST = {
@@ -203,7 +218,7 @@ export function apply(ctx) {
   // 内置示例角色通过 composition base 层提供：零启动写入（避免装载期排队写入
   // 命中被替换的注册）、无竞态；用户编辑写入 user 层覆盖 base。
   ctx.settings.register(ns, CosplaySettingsSchema, {
-    base: { enabled: false, activeRole: DEFAULT_ROLES[0].id, roles: DEFAULT_ROLES },
+    base: { enabled: false, thinkingStyle: 'neutral', activeRole: DEFAULT_ROLES[0].id, roles: DEFAULT_ROLES },
   })
 
   const read = () => normalizeState(ctx.settings.get(ns))
