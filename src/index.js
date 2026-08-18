@@ -118,6 +118,10 @@ for (const method of ['getState', 'upsertRole', 'removeRole', 'setActiveRole', '
   markRemoteMethod(CosplayRuntime.prototype, method)
 }
 
+/** strict codec 的极简 schema：透传校验（免 zod）。 */
+const passthroughSchema = { parse: (value) => value }
+const strictCodec = (typeSymbol) => ({ mode: 'strict', typeSymbol, schema: passthroughSchema })
+
 const COSPLAY_INVOCATIONS = [
   {
     id: 'dsh-cosplay#cosplay/getState',
@@ -126,7 +130,7 @@ const COSPLAY_INVOCATIONS = [
     method: 'getState',
     invocation: { kind: 'direct' },
     parameters: [],
-    result: { mode: 'src-json' },
+    result: strictCodec('dsh-cosplay#CosplayState'),
   },
   {
     id: 'dsh-cosplay#cosplay/upsertRole',
@@ -134,8 +138,8 @@ const COSPLAY_INVOCATIONS = [
     namespace: 'cosplay',
     method: 'upsertRole',
     invocation: { kind: 'direct' },
-    parameters: [{ name: 'card', wire: 'card', source: 'json', codec: { mode: 'src-json' } }],
-    result: { mode: 'src-json' },
+    parameters: [{ name: 'card', wire: 'card', source: 'json', codec: strictCodec('dsh-cosplay#RoleCard') }],
+    result: strictCodec('dsh-cosplay#CosplayState'),
   },
   {
     id: 'dsh-cosplay#cosplay/removeRole',
@@ -143,8 +147,8 @@ const COSPLAY_INVOCATIONS = [
     namespace: 'cosplay',
     method: 'removeRole',
     invocation: { kind: 'direct' },
-    parameters: [{ name: 'id', wire: 'id', source: 'json', codec: { mode: 'src-json' } }],
-    result: { mode: 'src-json' },
+    parameters: [{ name: 'id', wire: 'id', source: 'json', codec: strictCodec('dsh-cosplay#RoleId') }],
+    result: strictCodec('dsh-cosplay#CosplayState'),
   },
   {
     id: 'dsh-cosplay#cosplay/setActiveRole',
@@ -152,8 +156,8 @@ const COSPLAY_INVOCATIONS = [
     namespace: 'cosplay',
     method: 'setActiveRole',
     invocation: { kind: 'direct' },
-    parameters: [{ name: 'id', wire: 'id', source: 'json', codec: { mode: 'src-json' } }],
-    result: { mode: 'src-json' },
+    parameters: [{ name: 'id', wire: 'id', source: 'json', codec: strictCodec('dsh-cosplay#RoleId') }],
+    result: strictCodec('dsh-cosplay#CosplayState'),
   },
   {
     id: 'dsh-cosplay#cosplay/setEnabled',
@@ -161,8 +165,8 @@ const COSPLAY_INVOCATIONS = [
     namespace: 'cosplay',
     method: 'setEnabled',
     invocation: { kind: 'direct' },
-    parameters: [{ name: 'enabled', wire: 'enabled', source: 'json', codec: { mode: 'src-json' } }],
-    result: { mode: 'src-json' },
+    parameters: [{ name: 'enabled', wire: 'enabled', source: 'json', codec: strictCodec('dsh-cosplay#Enabled') }],
+    result: strictCodec('dsh-cosplay#CosplayState'),
   },
 ]
 

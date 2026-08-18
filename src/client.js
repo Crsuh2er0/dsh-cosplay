@@ -40,12 +40,16 @@ window.__ModuleLoader__.load({
     }
 
     // ── typert Remote 描述符（与主机侧 COSPLAY_INVOCATIONS 一致） ────────────
+    // 客户端挂载要求 strict codec（dsh-api-gateway 的 requireStrictCodec 拒绝
+    // src-json）；schema 用极简透传（{ parse: v => v }），免 zod。
+    const passthroughSchema = { parse: (value) => value }
+    const strictCodec = (typeSymbol) => ({ mode: 'strict', typeSymbol, schema: passthroughSchema })
     const COSPLAY_INVOCATIONS = [
-      { id: 'dsh-cosplay#cosplay/getState', service: 'cosplay', namespace: 'cosplay', method: 'getState', invocation: { kind: 'direct' }, parameters: [], result: { mode: 'src-json' } },
-      { id: 'dsh-cosplay#cosplay/upsertRole', service: 'cosplay', namespace: 'cosplay', method: 'upsertRole', invocation: { kind: 'direct' }, parameters: [{ name: 'card', wire: 'card', source: 'json', codec: { mode: 'src-json' } }], result: { mode: 'src-json' } },
-      { id: 'dsh-cosplay#cosplay/removeRole', service: 'cosplay', namespace: 'cosplay', method: 'removeRole', invocation: { kind: 'direct' }, parameters: [{ name: 'id', wire: 'id', source: 'json', codec: { mode: 'src-json' } }], result: { mode: 'src-json' } },
-      { id: 'dsh-cosplay#cosplay/setActiveRole', service: 'cosplay', namespace: 'cosplay', method: 'setActiveRole', invocation: { kind: 'direct' }, parameters: [{ name: 'id', wire: 'id', source: 'json', codec: { mode: 'src-json' } }], result: { mode: 'src-json' } },
-      { id: 'dsh-cosplay#cosplay/setEnabled', service: 'cosplay', namespace: 'cosplay', method: 'setEnabled', invocation: { kind: 'direct' }, parameters: [{ name: 'enabled', wire: 'enabled', source: 'json', codec: { mode: 'src-json' } }], result: { mode: 'src-json' } },
+      { id: 'dsh-cosplay#cosplay/getState', service: 'cosplay', namespace: 'cosplay', method: 'getState', invocation: { kind: 'direct' }, parameters: [], result: strictCodec('dsh-cosplay#CosplayState') },
+      { id: 'dsh-cosplay#cosplay/upsertRole', service: 'cosplay', namespace: 'cosplay', method: 'upsertRole', invocation: { kind: 'direct' }, parameters: [{ name: 'card', wire: 'card', source: 'json', codec: strictCodec('dsh-cosplay#RoleCard') }], result: strictCodec('dsh-cosplay#CosplayState') },
+      { id: 'dsh-cosplay#cosplay/removeRole', service: 'cosplay', namespace: 'cosplay', method: 'removeRole', invocation: { kind: 'direct' }, parameters: [{ name: 'id', wire: 'id', source: 'json', codec: strictCodec('dsh-cosplay#RoleId') }], result: strictCodec('dsh-cosplay#CosplayState') },
+      { id: 'dsh-cosplay#cosplay/setActiveRole', service: 'cosplay', namespace: 'cosplay', method: 'setActiveRole', invocation: { kind: 'direct' }, parameters: [{ name: 'id', wire: 'id', source: 'json', codec: strictCodec('dsh-cosplay#RoleId') }], result: strictCodec('dsh-cosplay#CosplayState') },
+      { id: 'dsh-cosplay#cosplay/setEnabled', service: 'cosplay', namespace: 'cosplay', method: 'setEnabled', invocation: { kind: 'direct' }, parameters: [{ name: 'enabled', wire: 'enabled', source: 'json', codec: strictCodec('dsh-cosplay#Enabled') }], result: strictCodec('dsh-cosplay#CosplayState') },
     ]
     const COSPLAY_REMOTE = { package: 'dsh-cosplay', descriptors: COSPLAY_INVOCATIONS }
 
