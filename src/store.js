@@ -136,13 +136,25 @@ export function renderPersona(role) {
   return parts.join('\n')
 }
 
+/** 思维链指令文本（DeepSeek 训练位文案，经系统提示层注入；上游：
+ * https://github.com/victorchen96/deepseek_v4_rolepaly_instruct）。
+ * 概率性触发（上游注明无法 100%），系统提示位较首轮 user 消息位弱，属已知权衡。 */
+export const THINKING_DIRECTIVES = {
+  role: '【角色沉浸要求】在你的思考过程（<think>标签内）中，请遵守以下规则：\n1. 请以角色第一人称进行内心独白，用括号包裹内心活动，例如"（心想：……）"或"(内心OS：……)"\n2. 用第一人称描写角色的内心感受，例如"我心想""我觉得""我暗自"等\n3. 思考内容应沉浸在角色中，通过内心独白分析剧情和规划回复',
+  neutral: '【思维模式要求】在你的思考过程（<think>标签内）中，请遵守以下规则：\n1. 禁止使用圆括号包裹内心独白，例如"（心想：……）"或"(内心OS：……)"，所有分析内容直接陈述即可\n2. 禁止以角色第一人称描写内心活动，例如"我心想""我觉得""我暗自"等，请用分析性语言替代\n3. 思考内容应聚焦于剧情走向分析和回复内容规划，不要在思考中进行角色扮演式的内心戏表演',
+}
+
 /**
  * 渲染当前生效的扮演段落（供 {{cosplay_active}} 变量每次组装时调用）：
  *   - 开关关闭 → 空串（人格静默回退默认）；
  *   - 开关开启但未选角色 → 引导语；
- *   - 开关开启且有激活角色 → 角色卡 persona。
- * 注：思考风格指令（思维链）不在此渲染——它在 agent/pre-step 阶段注入第一条
- * user 消息末尾（DeepSeek 思维链指令的训练位，见 docs），persona 只承担角色内容。
+ *   - 开关开启且有激活角色 → 角色卡 persona + 思维链指令（追加在末尾）。
+ *
+ * 思维链指令经系统提示层（persona 变量）注入：只出现在模型视图，会话消息与
+ * UI 永不显示；变量每次组装重新求值，切换思考风格下一模型步骤即生效、
+ * 无持久化残留。注：DeepSeek 训练位是首轮 user 消息末尾，但 agent/pre-step
+ * 注入会污染可见消息，llm/stream 对 LOOP 请求深冻结只读，故采用系统提示位
+ * （概率触发，用户已确认接受）。
  */
 export function renderActivePersona(state) {
   if (!state.enabled) return ''
@@ -150,7 +162,9 @@ export function renderActivePersona(state) {
   if (!active) {
     return 'Cosplay 模式已开启但未选择角色。可用 cosplay_list 查看、cosplay_switch 切换，或在设置页「角色扮演」中激活一个角色；在此之前请保持默认的助手身份与风格。'
   }
-  return renderPersona(active)
+  const directive = THINKING_DIRECTIVES[state.thinkingStyle]
+  const persona = renderPersona(active)
+  return directive ? `${persona}\n${directive}` : persona
 }
 
 // ── 酒馆 v2 导入导出映射 ────────────────────────────────────────────────────
@@ -207,34 +221,6 @@ export function fromV2Card(card, state) {
   }
   role.id = typeof ext.id === 'string' && ext.id ? ext.id : nextId(state || EMPTY_STATE, name)
   return role
-}
-
-/**
- * 思维链指令注入（纯函数）：在模型视图的**第一条 user 消息末尾**追加指令
- * （DeepSeek 思维链指令的训练位）。未启用、无指令或找不到 user 消息时原样返回。
- * 仅用于 agent/pre-step 的 enter 替换（不落盘）。
- * @param messages - 进入步骤的消息列表（UserMessage[] 形态的普通对象）。
- * @param state - 规整后的角色库状态。
- * @param directives - { neutral|role: string } 指令文本表。
- * @returns 替换后的消息列表。
- */
-export function applyThinkingDirective(messages, state, directives) {
-  if (!Array.isArray(messages) || messages.length === 0) return messages
-  if (!state.enabled) return messages
-  const directive = directives && directives[state.thinkingStyle]
-  if (directive === undefined) return messages
-  const idx = messages.findIndex((m) => m && m.source && m.source.kind === 'user')
-  if (idx < 0) return messages
-  const first = messages[idx]
-  const content = Array.isArray(first.content) ? [...first.content] : []
-  if (content.length === 0) return messages
-  const last = content.length - 1
-  const tail = content[last]
-  const modified =
-    tail && tail.type === 'text'
-      ? { ...first, content: content.map((b, i) => (i === last ? { ...b, text: `${b.text}\n\n${directive}` } : b)) }
-      : { ...first, content: [...content, { type: 'text', text: `\n\n${directive}` }] }
-  return messages.map((m, i) => (i === idx ? modified : m))
 }
 
 /** 工具视图用的角色摘要。 */

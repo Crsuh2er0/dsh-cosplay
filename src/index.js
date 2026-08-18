@@ -30,7 +30,6 @@ import {
   findRole,
   renderActivePersona,
   renderPersona,
-  applyThinkingDirective,
 } from './store.js'
 
 export const name = 'cosplay-core'
@@ -77,14 +76,6 @@ const textOutput = {
   render(_args, value) {
     return [{ type: 'text', text: String(value) }]
   },
-}
-
-// ── 思维链指令（DeepSeek 训练位：注入第一条 user 消息末尾） ────────────────
-// 文案来自 https://github.com/victorchen96/deepseek_v4_rolepaly_instruct
-// （DeepSeek V4 角色扮演思考模式切换指南），保持原文以对齐训练注入位置。
-const THINKING_DIRECTIVES = {
-  role: '【角色沉浸要求】在你的思考过程（<think>标签内）中，请遵守以下规则：\n1. 请以角色第一人称进行内心独白，用括号包裹内心活动，例如"（心想：……）"或"(内心OS：……)"\n2. 用第一人称描写角色的内心感受，例如"我心想""我觉得""我暗自"等\n3. 思考内容应沉浸在角色中，通过内心独白分析剧情和规划回复',
-  neutral: '【思维模式要求】在你的思考过程（<think>标签内）中，请遵守以下规则：\n1. 禁止使用圆括号包裹内心独白，例如"（心想：……）"或"(内心OS：……)"，所有分析内容直接陈述即可\n2. 禁止以角色第一人称描写内心活动，例如"我心想""我觉得""我暗自"等，请用分析性语言替代\n3. 思考内容应聚焦于剧情走向分析和回复内容规划，不要在思考中进行角色扮演式的内心戏表演',
 }
 
 // ── typert Remote（浏览器设置页的数据通道） ─────────────────────────────────
@@ -257,25 +248,12 @@ export function apply(ctx) {
     }
   }, 'dsh-cosplay: typert manifest')
 
-  // ── 人格注入（全局，随变量每次组装求值） ──────────────────────────────────
+  // ── 人格注入（全局，随变量每次组装求值；含思维链指令，见 store.js） ──────
   ctx.systemPrompt.variable('cosplay_active', () => renderActivePersona(read()))
   ctx.systemPrompt.section({
     name: PERSONA_SECTION_ADDON,
     order: PERSONA_ORDER + 1,
     text: '{{cosplay_active}}',
-  })
-
-  // ── 思维链指令注入（DeepSeek 训练位：第一条 user 消息末尾） ───────────────
-  // 仅影响模型视图（agent/pre-step 的 enter 替换），不落盘、UI 不显示；
-  // 每步对第一条 user 消息幂等追加，compaction 后自动恢复。
-  ctx.on('agent/created', ({ agent }) => {
-    agent.ctx.effect(() => {
-      const stop = agent.ctx.on('agent/pre-step', async ({ messages }, next) => {
-        const modified = applyThinkingDirective(messages, read(), THINKING_DIRECTIVES)
-        return modified === messages ? next() : { kind: 'enter', messages: modified }
-      })
-      return () => stop()
-    }, 'dsh-cosplay: thinking directive injection')
   })
 
   // ── 全局工具（模式门控：开关关闭时 switch 软禁用） ────────────────────────
