@@ -89,7 +89,7 @@ window.__ModuleLoader__.load({
       const remove = useCallback(async (id) => {
         if (typeof window !== 'undefined' && !window.confirm(`确定删除角色 ${id} 吗？`)) return
         await scope.set('roles', (value?.roles ?? []).filter((r) => r.id !== id))
-        if (value?.activeRole === id) await scope.set('activeRole', null)
+        if (value?.activeRole === id) await scope.unset('activeRole') // 清空用 unset（回退 schema 默认）
       }, [value, scope])
 
       const setActive = useCallback(async (id) => {

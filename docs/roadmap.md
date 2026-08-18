@@ -19,7 +19,7 @@
 | # | 决策 | 说明 |
 | --- | --- | --- |
 | D1 | **模式形态 = 全局设置开关**（非独立预设） | 用户提出独立模式无法与其他自定义模式（preset）组合——一个会话只能运行一个 preset，故放弃 Round 2 的预设形态。**纯全局开关**：开关 ON → 所有会话（含子代理，已确认）统一扮演 |
-| D2 | **角色库 = settings 命名空间 `cosplay`** | `$DSH_HOME/settings.yaml` 的 `cosplay:` 段；schema 校验、热重载、revision 栅栏。数据模型：`{ enabled: bool, activeRole: string\|null, roles: RoleCard[] }`，RoleCard 字段见 src/store.js |
+| D2 | **角色库 = settings 命名空间 `cosplay`** | `$DSH_HOME/settings.yaml` 的 `cosplay:` 段；schema 校验、热重载、revision 栅栏。数据模型：`{ enabled: bool, activeRole: string\|''（空串表未选）, roles: RoleCard[] }`；内置示例角色经 composition `base` 层提供（零启动写入，用户编辑写 user 层覆盖） |
 | D3 | **人格注入 = 全局追加人格段 + `{{cosplay_active}}` 变量** | 段名 `cosplay-persona`（≠ persona 段名 `deployment:persona`，无同名冲突），order = PERSONA_ORDER+1；变量每次模型步骤组装求值：开→角色卡，关→**空串静默回退**。开/关/换角色下一模型步骤即生效（已实测） |
 | D4 | **工具软禁用** | 全局注册 `cosplay_show/list/switch/upsert/remove`；`cosplay_switch` 在开关关闭时返回"请先开启"；角色库管理工具（list/show/upsert/remove）始终可用 |
 | D5 | **默认关闭（opt-in）** | 安装后默认不扮演，用户主动开启；内置示例角色（小林 / 前辈酱）种子写入，角色库管理在关闭时也可用 |

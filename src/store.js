@@ -111,12 +111,6 @@ export function setActiveRole(state, id) {
   return { ...state, activeRole: id }
 }
 
-/** 首次安装种子：角色库为空时写入内置示例角色并激活第一个（不改变开关默认关）。 */
-export function applySeeding(state) {
-  if (state.roles.length > 0) return state
-  return { ...state, roles: [...DEFAULT_ROLES], activeRole: state.activeRole ?? DEFAULT_ROLES[0].id }
-}
-
 /** 将一张角色卡渲染成 persona 段落文本。 */
 export function renderPersona(role) {
   if (!role) return ''

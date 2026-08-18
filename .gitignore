@@ -11,6 +11,9 @@ lib/
 npm-debug.log*
 pnpm-debug.log*
 
+# Packed artifacts
+*.tgz
+
 # OS / editor
 .DS_Store
 Thumbs.db

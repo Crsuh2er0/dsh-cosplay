@@ -6,13 +6,11 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   EMPTY_STATE,
-  DEFAULT_ROLES,
   normalizeState,
   findRole,
   upsertRole,
   removeRole,
   setActiveRole,
-  applySeeding,
   renderPersona,
   renderActivePersona,
   roleSummary,
@@ -72,16 +70,6 @@ test('removeRole / setActiveRole', () => {
   assert.throws(() => setActiveRole(s, 'missing'), /角色不存在/)
   assert.equal(setActiveRole(s, null).activeRole, null)
   assert.equal(setActiveRole(s, null).enabled, false) // 退出扮演不影响开关
-})
-
-test('applySeeding 仅当角色库为空时种入示例（不影响开关）', () => {
-  const seeded = applySeeding(EMPTY_STATE)
-  assert.deepEqual(seeded.roles, DEFAULT_ROLES)
-  assert.equal(seeded.activeRole, DEFAULT_ROLES[0].id)
-  assert.equal(seeded.enabled, false) // 默认关闭（opt-in）
-  const untouched = applySeeding({ enabled: true, activeRole: 'x', roles: [{ id: 'x', name: 'X', description: '' }] })
-  assert.equal(untouched.roles.length, 1)
-  assert.equal(untouched.enabled, true)
 })
 
 test('renderPersona / renderActivePersona（开关门控）', () => {

@@ -3,7 +3,8 @@
  *
  * 形态：全局开关（Round 3 决策）。
  *   - 注册 settings 命名空间 `cosplay`（角色库 + 开关，$DSH_HOME/settings.yaml，
- *     热重载、schema 校验、revision 栅栏写入）；
+ *     热重载、schema 校验、revision 栅栏写入；内置示例角色经 composition base
+ *     层提供，零启动写入）；
  *   - 提供 `cosplay` 服务（角色 CRUD / 激活 / 开关）；
  *   - 注册**全局**追加人格段 `cosplay-persona`（位于 persona 之后）与
  *     `{{cosplay_active}}` 变量：变量每次模型步骤组装时求值，开关关闭时渲染
@@ -12,8 +13,8 @@
  *   - 注册**全局** `cosplay_*` 工具：`cosplay_switch` 在开关关闭时软禁用
  *     （提示先开启）；角色库管理工具（list/show/upsert/remove）始终可用。
  *
- * 本行是纯主机平面：不依赖任何 preset，也不安装任何预设（Round 3 决策：移除
- * 独立「Cosplay 模式」预设）。全局生效范围含所有会话与子代理（用户已确认）。
+ * 本行是纯主机平面：不依赖任何 preset。全局生效范围含所有会话与子代理
+ * （Round 3 已与用户确认）。
  */
 import z from '@deepseek-ai/schemastery'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
@@ -21,7 +22,7 @@ import { PERSONA_ORDER } from '@deepseek-ai/dsh-system-prompt'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import {
   normalizeState,
-  applySeeding,
+  DEFAULT_ROLES,
   upsertRole,
   removeRole,
   setActiveRole,
@@ -34,25 +35,27 @@ export const name = 'cosplay-core'
 export const inject = ['settings', 'systemPrompt', 'tools']
 
 const RoleCardSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  emoji: z.string().optional(),
-  description: z.string(),
-  style: z.string().optional(),
-  rules: z.string().optional(),
-  greeting: z.string().optional(),
-  sample: z.string().optional(),
+  id: z.string().required(),
+  name: z.string().required(),
+  emoji: z.string().default(''),
+  description: z.string().required(),
+  style: z.string().default(''),
+  rules: z.string().default(''),
+  greeting: z.string().default(''),
+  sample: z.string().default(''),
 })
 
+// schemastery 无 null 类型：activeRole 以空串表示"未选择"（存储层），
+// store 层内部仍用 null 语义，写入时序列化为空串。
 const CosplaySettingsSchema = z.object({
   enabled: z.boolean().default(false),
-  activeRole: z.string().nullable().default(null),
+  activeRole: z.string().default(''),
   roles: z.array(RoleCardSchema).default([]),
 })
 
 export const Config = z.object({})
 
-/** 追加人格段的段名（与 persona 不同名，避免同一层重复名冲突）。 */
+/** 追加人格段的段名（与 persona 段名不同，避免同一层重复名冲突）。 */
 export const PERSONA_SECTION_ADDON = 'cosplay-persona'
 
 const textOutput = {
@@ -64,19 +67,17 @@ const textOutput = {
 
 export function apply(ctx) {
   const ns = settingsNamespace('cosplay')
-  const scope = ctx.settings.register(ns, CosplaySettingsSchema)
+  // 内置示例角色通过 composition base 层提供：零启动写入（避免装载期排队写入
+  // 命中被替换的注册）、无竞态；用户编辑写入 user 层覆盖 base。
+  const scope = ctx.settings.register(ns, CosplaySettingsSchema, {
+    base: { enabled: false, activeRole: DEFAULT_ROLES[0].id, roles: DEFAULT_ROLES },
+  })
 
   const read = () => normalizeState(ctx.settings.get(ns))
   const write = async (next) => {
-    await ctx.settings.replace(ns, next)
+    // 序列化：activeRole 的 null 语义 → 空串（schema 无 null 类型）
+    await ctx.settings.replace(ns, { ...next, activeRole: next.activeRole ?? '' })
     return next
-  }
-
-  // 首次安装种子：角色库为空时写入内置示例角色并激活第一个（开关保持默认关）。
-  const current = read()
-  const seeded = applySeeding(current)
-  if (seeded.roles.length !== current.roles.length) {
-    void ctx.settings.replace(ns, seeded)
   }
 
   // ── cosplay 服务 ──────────────────────────────────────────────────────────
@@ -115,7 +116,7 @@ export function apply(ctx) {
     description:
       '查看当前激活角色的角色卡，或按 id 查看指定角色的角色卡。用于确认角色设定、语气与行为守则（Cosplay 开关关闭时也可预览）。',
     parameters: {
-      id: { type: 'string', required: false, description: '角色 id；省略时返回当前激活角色。' },
+      id: { type: 'string', description: '角色 id；省略时返回当前激活角色。' },
     },
     output: textOutput,
     async execute(args) {
@@ -167,14 +168,14 @@ export function apply(ctx) {
     description:
       '创建或更新一个角色（角色库管理，开关关闭时也可用）。未提供 id 时创建新角色（按 name 生成 id）；提供 id 时更新既有角色。支持用户随时自定义任何角色。',
     parameters: {
-      id: { type: 'string', required: false, description: '既有角色 id；省略表示新建。' },
+      id: { type: 'string', description: '既有角色 id；省略表示新建。' },
       name: { type: 'string', required: true, description: '角色显示名。' },
-      emoji: { type: 'string', required: false, description: '头像字符（如 📚）。' },
+      emoji: { type: 'string', description: '头像字符（如 📚）。' },
       description: { type: 'string', required: true, description: '角色背景与性格设定（我是谁）。' },
-      style: { type: 'string', required: false, description: '说话风格（怎么说话）。' },
-      rules: { type: 'string', required: false, description: '行为守则（该做什么 / 不做什么）。' },
-      greeting: { type: 'string', required: false, description: '开场白。' },
-      sample: { type: 'string', required: false, description: '示例对话（few-shot）。' },
+      style: { type: 'string', description: '说话风格（怎么说话）。' },
+      rules: { type: 'string', description: '行为守则（该做什么 / 不做什么）。' },
+      greeting: { type: 'string', description: '开场白。' },
+      sample: { type: 'string', description: '示例对话（few-shot）。' },
     },
     output: textOutput,
     async execute(args) {
