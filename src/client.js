@@ -64,7 +64,7 @@ window.__ModuleLoader__.load({
       button: { border: '1px solid var(--dsw-alias-border-strong, rgba(128,128,128,.3))', background: 'transparent', color: 'inherit', borderRadius: '8px', padding: '4px 10px', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' },
       buttonPrimary: { border: 'none', background: 'var(--dsw-specific-accent, #4d6bfe)', color: '#fff', borderRadius: '8px', padding: '5px 12px', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' },
       input: { background: 'transparent', border: '1px solid var(--dsw-alias-border-strong, rgba(128,128,128,.3))', borderRadius: '8px', padding: '5px 8px', color: 'inherit', fontSize: '13px', fontFamily: 'inherit', flex: 1, minWidth: '160px' },
-      textarea: { background: 'transparent', border: '1px solid var(--dsw-alias-border-strong, rgba(128,128,128,.3))', borderRadius: '8px', padding: '5px 8px', color: 'inherit', fontSize: '13px', fontFamily: 'inherit', width: '100%', minHeight: '56px', resize: 'vertical', boxSizing: 'border-box' },
+      textarea: { background: 'transparent', border: '1px solid var(--dsw-alias-border-strong, rgba(128,128,128,.3))', borderRadius: '8px', padding: '5px 8px', color: 'inherit', fontSize: '13px', fontFamily: 'inherit', width: '100%', minHeight: '56px', resize: 'vertical', overflowY: 'auto', lineHeight: '1.5', boxSizing: 'border-box' },
       badge: { fontSize: '12px', padding: '1px 8px', borderRadius: '99px', background: 'var(--dsw-specific-accent, #4d6bfe)', color: '#fff' },
       label: { fontSize: '12px', opacity: 0.6, minWidth: '64px' },
     }
@@ -405,13 +405,13 @@ window.__ModuleLoader__.load({
             'div',
             { style: styles.row },
             React.createElement('span', { style: styles.label }, '语气'),
-            React.createElement('input', { style: styles.input, value: form.style, onChange: (e) => setField('style', e.target.value), placeholder: '说话风格（怎么说话）' }),
+            React.createElement('textarea', { style: { ...styles.textarea, minHeight: '64px' }, value: form.style, onChange: (e) => setField('style', e.target.value), placeholder: '说话风格（怎么说话）' }),
           ),
           React.createElement(
             'div',
             { style: styles.row },
             React.createElement('span', { style: styles.label }, '守则'),
-            React.createElement('input', { style: styles.input, value: form.rules, onChange: (e) => setField('rules', e.target.value), placeholder: '行为守则（该做什么 / 不做什么）' }),
+            React.createElement('textarea', { style: { ...styles.textarea, minHeight: '64px' }, value: form.rules, onChange: (e) => setField('rules', e.target.value), placeholder: '行为守则（该做什么 / 不做什么）' }),
           ),
           React.createElement(
             'div',
@@ -435,13 +435,13 @@ window.__ModuleLoader__.load({
             'div',
             { style: styles.row },
             React.createElement('span', { style: styles.label }, '开场白'),
-            React.createElement('input', { style: styles.input, value: form.first_mes, onChange: (e) => setField('first_mes', e.target.value), placeholder: '可选' }),
+            React.createElement('textarea', { style: { ...styles.textarea, minHeight: '64px' }, value: form.first_mes, onChange: (e) => setField('first_mes', e.target.value), placeholder: '可选' }),
           ),
           React.createElement(
             'div',
             { style: styles.row },
             React.createElement('span', { style: styles.label }, '备注'),
-            React.createElement('input', { style: styles.input, value: form.creator_notes, onChange: (e) => setField('creator_notes', e.target.value), placeholder: '创建者笔记（不注入人格）' }),
+            React.createElement('textarea', { style: { ...styles.textarea, minHeight: '64px' }, value: form.creator_notes, onChange: (e) => setField('creator_notes', e.target.value), placeholder: '创建者笔记（不注入人格）' }),
           ),
           React.createElement(
             'div',
