@@ -1,0 +1,29 @@
+# dsh-cosplay bundle patch — round 1 scaffold (empty, documented).
+#
+# This file is the bundle layer a profile composes. The profile launcher
+# resolves this package through the `dsh.bundle.patch` manifest key and applies
+# this patch list AFTER the `dsh-base` / `dsh-web-app` bundle layers and BEFORE
+# the profile's own `cordis.patch.yml` (last write wins per row id).
+#
+# Format: a top-level YAML array of loader patch entries (see
+# docs/dsh-plugin-spec.md for the full spec, verified against the installed
+# DeepSeek Harness 0.1.0-rc.6):
+#
+#   - insert:                      # append rows to the entry list
+#       - id: cosplay-core         # unique row id (overridable by later layers)
+#         name: 'dsh-cosplay'      # npm package exporting a cordis plugin
+#         config: { ... }          # plugin Config (schema-validated at mount)
+#         disabled: false
+#
+#   - id: <existing-row-id>        # target an already-inserted row ...
+#     config: { ... }              # ... to replace its WHOLE config ...
+#     disabled: true               # ... or to disable it.
+#
+# `!!js` expressions are allowed (e.g. `!!js process.env.X ?? 'default'`), and
+# row order carries no load semantics — activation is service-availability
+# driven.
+#
+# Rows will be added in later rounds as the plugin is implemented (host core,
+# settings persistence, client settings UI, tools). An empty list is a valid
+# patch layer: it composes nothing and warns on nothing.
+[]
