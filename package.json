@@ -1,23 +1,21 @@
 {
   "name": "dsh-cosplay",
-  "version": "0.2.0",
-  "description": "Cosplay mode for DeepSeek Harness: turn the agent into any character you define, with a settings UI for role configuration and management.",
+  "version": "0.3.0",
+  "description": "Cosplay mode for DeepSeek Harness: a global switch turns the agent into any character you define, with a settings UI for role configuration and management.",
   "type": "module",
   "main": "src/index.js",
   "exports": {
     ".": "./src/index.js",
-    "./preset": "./src/preset.js",
     "./client": "./src/client.js",
     "./package.json": "./package.json"
   },
   "files": [
     "src/",
-    "preset/",
     "cordis.patch.yml"
   ],
   "scripts": {
     "test": "node test/store.test.mjs",
-    "check": "node --check src/store.js && node --check src/index.js && node --check src/preset.js && node --check src/client.js"
+    "check": "node --check src/store.js && node --check src/index.js && node --check src/client.js"
   },
   "keywords": [
     "dsh",
@@ -35,17 +33,21 @@
     "client": {
       "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-runtime"
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-ui-settings"
       ]
     }
   },
   "dependencies": {
-    "@deepseek-ai/dsh-home-paths": "^0.1.0-rc.6",
     "@deepseek-ai/schemastery": "^3.18.1"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-home-paths": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-tools": "^0.1.0-rc.6"
   }
 }

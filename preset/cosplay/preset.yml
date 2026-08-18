@@ -1,2 +1,0 @@
-name: Cosplay 模式
-description: 角色扮演模式（dsh-cosplay）：以自定义角色的设定、语气与行为守则进行对话，同时保留 Agent 的实际工作能力。该预设由 dsh-cosplay 插件自动安装，编辑前请知悉会被插件幂等管理。

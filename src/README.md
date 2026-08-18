@@ -5,17 +5,20 @@
 
 ```text
 src/
-├── store.js    # 角色库纯函数：状态规整 / CRUD / 种子 / persona 渲染（零依赖）
-├── index.js    # 主机核心行（cosplay-core）：settings 命名空间 + cosplay 服务
-│               #   + Cosplay 预设幂等安装（$DSH_HOME/.agent-presets/cosplay）
-├── preset.js   # Cosplay 预设行（dsh-cosplay/preset）：{{cosplay_active}} 变量
-│               #   + cosplay_show/list/switch/upsert/remove 工具（模式门控）
-└── client.js   # 浏览器半区（dsh-cosplay/client）：settings.section「角色扮演」页
+├── store.js    # 角色库纯函数：状态规整（enabled/activeRole/roles）/ CRUD /
+│               #   种子 / persona 渲染（零依赖，可独立测试）
+├── index.js    # 主机核心行（cosplay-core，组合唯一入口）：
+│               #   settings 命名空间 + cosplay 服务 + 全局人格段（cosplay-persona）
+│               #   + {{cosplay_active}} 变量 + 全局 cosplay_* 工具（switch 软禁用）
+└── client.js   # 浏览器半区（dsh-cosplay/client）：设置页「角色扮演」
+                #   （开关 + 角色 CRUD，经 settingsScope 读写）
 ```
 
 平台拆分依据（见 docs/dsh-plugin-spec.md）：
 
-- 持久化、服务、预设安装 → Host；
+- 持久化、服务、人格注入、工具 → Host（全局开关形态，无 preset 参与）；
 - 设置页 Slot UI → Client（`__ModuleLoader__` 格式，经 `dsh.client` 声明装载）；
-- 客户端读写角色库走 settings scope（dsh-client-ui-settings 的 attachSettings 机制，
-  Round 3 实现时按该包源码精确对接）。
+- 客户端读写角色库走 `ctx.settingsScope.bind({ namespace: 'cosplay' })`
+  （dsh-client-ui-settings 提供的 Host 传输），组件用
+  `useSyncExternalStore(scope.subscribe, scope.getSnapshot)` 订阅快照，
+  `scope.set(field, value)` 写入。

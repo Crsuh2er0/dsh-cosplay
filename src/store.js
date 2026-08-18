@@ -4,7 +4,8 @@
  * 角色库以 settings 命名空间 `cosplay` 的用户层文档存储：
  *
  *   cosplay:
- *     activeRole: <role-id | null>
+ *     enabled: boolean        # 全局模式开关（默认 false，opt-in）
+ *     activeRole: string|null # 当前激活角色
  *     roles:
  *       - id: string            # 稳定 slug
  *         name: string          # 显示名
@@ -38,7 +39,7 @@ export const DEFAULT_ROLES = [
   },
 ]
 
-export const EMPTY_STATE = { activeRole: null, roles: [] }
+export const EMPTY_STATE = { enabled: false, activeRole: null, roles: [] }
 
 /** 将任意来源的值规整为角色库状态（防御性过滤）。 */
 export function normalizeState(value) {
@@ -52,7 +53,11 @@ export function normalizeState(value) {
     typeof v.activeRole === 'string' && roles.some((r) => r.id === v.activeRole)
       ? v.activeRole
       : null
-  return { activeRole, roles }
+  return {
+    enabled: v.enabled === true,
+    activeRole,
+    roles,
+  }
 }
 
 /** 按 id 查找角色。 */
@@ -99,14 +104,14 @@ export function removeRole(state, id) {
   }
 }
 
-/** 切换激活角色；id 为 null 表示退出扮演。 */
+/** 切换激活角色；id 为 null 表示退出扮演（保留开关状态）。 */
 export function setActiveRole(state, id) {
   if (id === null) return { ...state, activeRole: null }
   if (!findRole(state, id)) throw new Error(`角色不存在: ${id}`)
   return { ...state, activeRole: id }
 }
 
-/** 首次安装种子：无角色时写入内置示例并激活第一个。 */
+/** 首次安装种子：角色库为空时写入内置示例角色并激活第一个（不改变开关默认关）。 */
 export function applySeeding(state) {
   if (state.roles.length > 0) return state
   return { ...state, roles: [...DEFAULT_ROLES], activeRole: state.activeRole ?? DEFAULT_ROLES[0].id }
@@ -125,11 +130,17 @@ export function renderPersona(role) {
   return parts.join('\n')
 }
 
-/** 渲染当前激活角色的 persona 文本；未选择角色时给出引导语（不可返回空串）。 */
+/**
+ * 渲染当前生效的扮演段落（供 {{cosplay_active}} 变量每次组装时调用）：
+ *   - 开关关闭 → 返回空串（人格静默回退默认，不产生任何扮演内容）；
+ *   - 开关开启但未选角色 → 返回引导语；
+ *   - 开关开启且有激活角色 → 返回角色卡 persona 文本。
+ */
 export function renderActivePersona(state) {
+  if (!state.enabled) return ''
   const active = state.activeRole ? findRole(state, state.activeRole) : undefined
   if (!active) {
-    return '当前未选择任何角色。可用 cosplay_list 查看、cosplay_switch 切换，或在设置页「角色扮演」中管理；在此之前请保持默认的助手身份与风格。'
+    return 'Cosplay 模式已开启但未选择角色。可用 cosplay_list 查看、cosplay_switch 切换，或在设置页「角色扮演」中激活一个角色；在此之前请保持默认的助手身份与风格。'
   }
   return renderPersona(active)
 }

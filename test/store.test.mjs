@@ -1,6 +1,6 @@
 /**
- * dsh-cosplay 纯函数角色库单元测试（node --test，零依赖）。
- * 运行：npm test 或 node --test test/
+ * dsh-cosplay 纯函数角色库单元测试（node，零依赖）。
+ * 运行：npm test
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -18,10 +18,13 @@ import {
   roleSummary,
 } from '../src/store.js'
 
-test('normalizeState 规整任意输入', () => {
+test('normalizeState 规整任意输入（含 enabled）', () => {
   assert.deepEqual(normalizeState(undefined), EMPTY_STATE)
   assert.deepEqual(normalizeState(null), EMPTY_STATE)
+  assert.equal(normalizeState({ enabled: true }).enabled, true)
+  assert.equal(normalizeState({ enabled: 'yes' }).enabled, false) // 非布尔视为关
   assert.deepEqual(normalizeState({ roles: [{ id: 'a', name: 'A' }] }), {
+    enabled: false,
     activeRole: null,
     roles: [{ id: 'a', name: 'A' }],
   })
@@ -41,6 +44,7 @@ test('upsertRole 新建 / 更新 / id 生成', () => {
   assert.equal(created.roles[0].description, 'd')
   assert.ok(created.roles[0].id.startsWith('role-')) // 中文名退化为随机 id
   assert.equal(created.activeRole, null) // 不自动激活
+  assert.equal(created.enabled, false) // enabled 透传
 
   const ascii = upsertRole(EMPTY_STATE, { name: 'Miku Chan', description: 'd' })
   assert.equal(ascii.roles[0].id, 'miku-chan')
@@ -67,17 +71,20 @@ test('removeRole / setActiveRole', () => {
   assert.equal(s.activeRole, b)
   assert.throws(() => setActiveRole(s, 'missing'), /角色不存在/)
   assert.equal(setActiveRole(s, null).activeRole, null)
+  assert.equal(setActiveRole(s, null).enabled, false) // 退出扮演不影响开关
 })
 
-test('applySeeding 仅当角色库为空时种入示例', () => {
+test('applySeeding 仅当角色库为空时种入示例（不影响开关）', () => {
   const seeded = applySeeding(EMPTY_STATE)
   assert.deepEqual(seeded.roles, DEFAULT_ROLES)
   assert.equal(seeded.activeRole, DEFAULT_ROLES[0].id)
-  const untouched = applySeeding({ activeRole: 'x', roles: [{ id: 'x', name: 'X', description: '' }] })
+  assert.equal(seeded.enabled, false) // 默认关闭（opt-in）
+  const untouched = applySeeding({ enabled: true, activeRole: 'x', roles: [{ id: 'x', name: 'X', description: '' }] })
   assert.equal(untouched.roles.length, 1)
+  assert.equal(untouched.enabled, true)
 })
 
-test('renderPersona / renderActivePersona', () => {
+test('renderPersona / renderActivePersona（开关门控）', () => {
   const role = { id: 'a', name: '阿明', emoji: '🦊', description: '一只狐狸', style: '俏皮' }
   const text = renderPersona(role)
   assert.ok(text.includes('阿明'))
@@ -85,12 +92,21 @@ test('renderPersona / renderActivePersona', () => {
   assert.ok(text.includes('俏皮'))
   assert.ok(text.includes('Agent'))
 
-  const s = setActiveRole(upsertRole(EMPTY_STATE, { name: 'A', description: 'd' }), null)
-  assert.ok(renderActivePersona(s).includes('未选择任何角色')) // 无角色时仍返回引导文本
-  const s2 = setActiveRole(upsertRole(EMPTY_STATE, { name: 'A', description: 'd' }), null)
-  const id = upsertRole(s2, { name: 'A', description: 'd' }).roles[0].id
-  const s3 = setActiveRole(upsertRole(s2, { name: 'A', description: 'd' }), id)
-  assert.ok(renderActivePersona(s3).includes('A'))
+  // 关闭：空串（静默回退默认人格）
+  assert.equal(renderActivePersona(EMPTY_STATE), '')
+  const offWithRole = setActiveRole(upsertRole(EMPTY_STATE, { name: 'A', description: 'd' }), null)
+  const rid = upsertRole(offWithRole, { name: 'A', description: 'd' }).roles[0].id
+  const offActive = setActiveRole(upsertRole(offWithRole, { name: 'A', description: 'd' }), rid)
+  assert.equal(offActive.enabled, false)
+  assert.equal(renderActivePersona(offActive), '') // 即使有激活角色，关闭时也渲染空串
+
+  // 开启但未选角色：引导语
+  const onNoRole = { ...EMPTY_STATE, enabled: true }
+  assert.ok(renderActivePersona(onNoRole).includes('未选择角色'))
+
+  // 开启 + 激活角色：角色卡
+  const onActive = { ...offActive, enabled: true }
+  assert.ok(renderActivePersona(onActive).includes('A'))
 })
 
 test('roleSummary', () => {

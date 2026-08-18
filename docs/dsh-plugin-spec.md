@@ -149,7 +149,7 @@ $DSH_HOME/.agent-presets/cosplay/
 ## 7. 第三方 bundle 实践补充（dsh-cosplay 采用的变体）
 
 - **纯 JS ESM 包**：不强制 TypeScript。`main`/`exports` 直接指向 `src/*.js`，
-  `files` 白名单含 `src/` 与 `preset/`，无需构建步骤。
+  `files` 白名单含 `src/` 与 `cordis.patch.yml`，无需构建步骤。
 - **双半区声明**：`package.json` 的 `"dsh": { "bundle": { "patch": "..." },
   "client": { "platform": "web", "inject": [...] } }` —— 一个组合行即同时承载
   主机半区（包主入口）与浏览器半区（`exports["./client"]`），后者由
@@ -159,6 +159,13 @@ $DSH_HOME/.agent-presets/cosplay/
   `require('react')` 获取，Slots 服务经 `ctx.get('slots')` 消费。
 - **设置页新增项**：`settings.section`（list 协议，`{name, id, order, label}`）
   的每个条目就是一个设置页/侧边栏项，与 General / Models / Plugins 同级。
+- **全局追加人格段（开关式身份切换）**：宿主行可用 `systemPrompt.section`
+  注册一个**与 persona 不同名**（如 `cosplay-persona`）、order 紧随
+  `PERSONA_ORDER`（=0）之后的全局段落，文本引用自定义变量
+  （`{{cosplay_active}}`）；变量提供器在**每次组装**读取 settings 命名空间：
+  开启 → 渲染角色卡，关闭 → 渲染**空串**（段落静默消失、人格回退默认）。
+  段落/变量同名时"作用域遮蔽全局"，同名同层重复注册会抛错（实测：空串渲染
+  不破坏组装）。
 - **服务提供**：`ctx.provide(name, value)`（dsh-app-boot 的 `dshHomePath` 同款），
   返回的 disposer 随 fiber 自动清理。
 - **客户端读设置**：settings 命名空间的浏览器镜像走 `dsh-client-ui-settings` 的

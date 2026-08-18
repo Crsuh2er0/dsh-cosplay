@@ -1,15 +1,14 @@
 # dsh-cosplay bundle patch — 主机组合层。
 #
-# 应用顺序：dsh-base → dsh-web-app → 本层 → profile 用户层（后写胜出）。
-# 本层只插入主机平面基础设施；Cosplay 模式的“生效门控”在 agent preset
-# （preset/cosplay/agent.cordis.yml）里：cosplay_* 工具与 {{cosplay_active}}
-# 变量仅随该预设装载，普通会话完全不受影响。
-
+# 形态（Round 3 决策）：全局开关，无独立预设、无预设行。
+# 单个主机行 cosplay-core 完成全部能力：
+#   - settings 命名空间 `cosplay`（开关 + 角色库，$DSH_HOME/settings.yaml）；
+#   - 全局追加人格段 cosplay-persona + {{cosplay_active}} 变量（每次模型步骤
+#     求值：开关关 → 空串静默回退；开 → 激活角色卡）；
+#   - 全局 cosplay_* 工具（switch 在开关关闭时软禁用，管理工具始终可用）；
+#   - 浏览器侧设置页「角色扮演」（同一行经 package.json 的 dsh.client 声明
+#     自动装载 ./client）。
 - insert:
-    # 主机侧核心：settings 命名空间 `cosplay`（角色库）+ `cosplay` 服务
-    # + Cosplay 预设幂等安装。同一行同时承载浏览器侧（package.json 的
-    # dsh.client 声明 + ./client 导出），由 dsh-client-modules 自动扫描。
     - id: cosplay-core
       name: 'dsh-cosplay'
-      config:
-        autoInstallPreset: true
+      config: {}
