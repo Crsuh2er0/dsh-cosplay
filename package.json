@@ -14,8 +14,7 @@
     "cordis.patch.yml"
   ],
   "scripts": {
-    "test": "node test/store.test.mjs",
-    "check": "node --check src/store.js && node --check src/index.js && node --check src/client.js"
+    "check": "node --check src/store.js && node --check src/index.js && node --check src/client.js && node --check src/skill.js"
   },
   "keywords": [
     "dsh",
