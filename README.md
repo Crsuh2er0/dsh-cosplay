@@ -19,7 +19,8 @@ dsh-cosplay 是一个面向 [DeepSeek Harness](https://github.com/deepseek-ai/De
 - **实时生效**：插件注册全局人格段 `cosplay-persona`，内容由 `{{cosplay_active}}`
   变量在**每次模型步骤**从角色库求值 —— 开关切换与角色切换无需重建会话。
 - **角色库**：持久化于 `$DSH_HOME/settings.yaml` 的 `cosplay:` 段（schema 校验、
-  热重载）；内置小林、前辈酱两个示例角色（composition base 层提供，零启动写入）。
+  热重载）；**角色卡对齐 SillyTavern（酒馆）v2 规范**，可导入/导出标准
+  `chara_card_v2` JSON 跨工具共享；内置唯一默认角色**蓝色大肥鱼**（鲸鱼娘）。
 - **工具软禁用**：`cosplay_switch` 在开关关闭时提示先开启；角色库管理
   （`cosplay_show/list/upsert/remove`）始终可用。
 

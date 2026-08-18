@@ -6,6 +6,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   EMPTY_STATE,
+  DEFAULT_ROLES,
   normalizeState,
   findRole,
   upsertRole,
@@ -14,6 +15,8 @@ import {
   renderPersona,
   renderActivePersona,
   roleSummary,
+  toV2Card,
+  fromV2Card,
 } from '../src/store.js'
 
 test('normalizeState 规整任意输入（含 enabled / thinkingStyle）', () => {
@@ -115,4 +118,44 @@ test('roleSummary', () => {
     active: true,
   })
   assert.equal(findRole(EMPTY_STATE, 'nope'), undefined)
+})
+
+test('酒馆 v2 导入导出映射', () => {
+  const role = { id: 'x', name: '测试', emoji: '🐋', description: 'd', personality: 'p', style: 's', rules: 'r', behavior: 'b', scenario: 'sc', first_mes: 'fm', mes_example: 'me', system_prompt: 'sp', creator_notes: 'cn', tags: ['a'] }
+  const v2 = toV2Card(role)
+  assert.equal(v2.spec, 'chara_card_v2')
+  assert.equal(v2.spec_version, '2.0')
+  assert.equal(v2.data.name, '测试')
+  assert.equal(v2.data.description, 'd')
+  assert.equal(v2.data.extensions.dshCosplay.id, 'x')
+  assert.equal(v2.data.extensions.dshCosplay.emoji, '🐋')
+  assert.equal(v2.data.extensions.dshCosplay.style, 's')
+  // 往返无损
+  const back = fromV2Card(v2, EMPTY_STATE)
+  assert.equal(back.id, 'x')
+  assert.equal(back.name, '测试')
+  assert.equal(back.personality, 'p')
+  assert.equal(back.behavior, 'b')
+  assert.equal(back.system_prompt, 'sp')
+  assert.deepEqual(back.tags, ['a'])
+  // 缺 name 报错
+  assert.throws(() => fromV2Card({ data: {} }, EMPTY_STATE), /name/)
+  // 无 extensions 的纯 v2 卡也能导入（id 自动生成）
+  const plain = fromV2Card({ spec: 'chara_card_v2', data: { name: '外来卡', description: 'x' } }, EMPTY_STATE)
+  assert.ok(plain.id)
+  assert.equal(plain.name, '外来卡')
+  assert.equal(plain.emoji, '')
+})
+
+test('默认角色 = 蓝色大肥鱼（v2 字段，指令块置顶）', () => {
+  assert.equal(DEFAULT_ROLES.length, 1)
+  assert.equal(DEFAULT_ROLES[0].id, 'blue-fat-whale')
+  assert.equal(DEFAULT_ROLES[0].name, '蓝色大肥鱼')
+  assert.ok(DEFAULT_ROLES[0].system_prompt.includes('[PERSONA_LOAD]'))
+  const persona = renderPersona(DEFAULT_ROLES[0])
+  assert.ok(persona.includes('蓝色大肥鱼'))
+  assert.ok(persona.includes('🐋'))
+  assert.ok(persona.indexOf('[PERSONA_LOAD]') < persona.indexOf('【身份】'))
+  assert.ok(persona.includes('【守则】'))
+  assert.ok(persona.includes('【示例对话】'))
 })

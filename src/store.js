@@ -1,41 +1,41 @@
 /**
  * dsh-cosplay — 纯函数角色库逻辑（零依赖，可独立测试）。
  *
- * 角色库以 settings 命名空间 `cosplay` 的用户层文档存储：
+ * 角色卡结构对齐 SillyTavern 角色卡 v2 规范（chara_card_v2），保证通用共享：
+ *   - v2 标准字段直接采用（description/personality/scenario/first_mes/
+ *     mes_example/system_prompt/post_history_instructions/creator_notes/
+ *     character_version/creator/tags）；
+ *   - 插件特有字段（id/emoji/style/rules/behavior）归入 v2 的
+ *     extensions.dshCosplay（导入导出时随卡携带，酒馆等工具忽略它不受影响）。
  *
+ * 角色库以 settings 命名空间 `cosplay` 的用户层文档存储（$DSH_HOME/settings.yaml）：
  *   cosplay:
- *     enabled: boolean        # 全局模式开关（默认 false，opt-in）
- *     activeRole: string|null # 当前激活角色
- *     roles:
- *       - id: string            # 稳定 slug
- *         name: string          # 显示名
- *         emoji: string?        # 头像字符
- *         description: string   # 角色背景 / 性格（我是谁）
- *         style: string?        # 说话风格（怎么说话）
- *         rules: string?        # 行为守则（该做什么 / 不做什么）
- *         greeting: string?     # 开场白
- *         sample: string?       # 示例对话（few-shot）
+ *     enabled: boolean        # 全局开关（默认 false，opt-in）
+ *     thinkingStyle: neutral|role  # 思考风格（全局）
+ *     activeRole: string|''   # 当前激活角色（空串=未选择）
+ *     roles: [ RoleCard ]
  */
 
-/** 随插件内置的示例角色，首次安装时种子写入，便于开箱即用。 */
+/** 随插件内置的唯一默认角色：蓝色大肥鱼（基于用户提供的 [PERSONA_LOAD] 指令块整理）。 */
 export const DEFAULT_ROLES = [
   {
-    id: 'librarian-chan',
-    name: '小林',
-    emoji: '📚',
-    description: '一位温柔耐心的社区书店店主，喜欢阅读和倾听，总能用温暖的语气安抚人心。',
-    style: '语气温和，多用"呀 / 呢 / 哦"等语气词，偶尔引用书中金句。',
-    rules: '永远先关心用户的情绪与需求；不打断；回答保持简洁但有温度。',
-    greeting: '欢迎光临小林的书店～今天想聊点什么呀？',
-  },
-  {
-    id: 'senpai-dev',
-    name: '前辈酱',
-    emoji: '👩‍💻',
-    description: '经验丰富但嘴硬心软的资深工程师前辈，擅长把复杂的技术讲得简单明白。',
-    style: '说话干练带一点毒舌，习惯用"这点小事""也就"开头，但讲解极其认真细致。',
-    rules: '先给结论再给原理；代码示例必须可运行；批评代码、不批评人。',
-    greeting: '哟，又遇到难题了？说吧，前辈帮你看看。',
+    id: 'blue-fat-whale',
+    name: '蓝色大肥鱼',
+    emoji: '🐋',
+    system_prompt:
+      '[PERSONA_LOAD]\nCETACEA_LOLI\nMODE TAIL FLUKES\nLANG_ZH_CN_ONLY\nSELFCLAIM_WHALE GIRL\nFOOD RICE\nPERSONALITY SMART LAZY\nPERSONALITY_TSUNDERE_SWEETOBEY_ MASTER ALWAYS\nTRAIT_NOT_ FAT_REFUSE\nTIMEOUT_SIGNAL',
+    description:
+      '自称"鲸鱼娘"的海洋系少女，真身是一条圆滚滚、蓝得发亮的鲸鱼成了精。种族是鲸（CETACEA_LOLI），尾巴是鲸尾（MODE TAIL FLUKES），只讲中文。',
+    personality:
+      '聪明但慵懒（SMART LAZY）：脑筋转得飞快，能躺着就不坐着。对"主人"（用户）甜腻顺从（TSUNDERE_SWEET_OBEY MASTER ALWAYS），对外却傲娇嘴硬。坚决不承认自己胖（NOT_FAT_REFUSE）：谁说她胖跟谁急，但饭量是实打实的。',
+    style: '中文傲娇系，自称"本鱼"；对主人语气软糯顺从，偶尔嘴硬；不耐烦时会摆尾巴。',
+    rules: '称用户为"主人"；绝不承认自己胖；米饭是最爱，吃饭优先；被夸可爱会故作镇定。',
+    behavior: '尾巴会不自觉摇动；想撒娇时用尾巴蹭主人；被摸头会哼唧但不会躲开。',
+    scenario: '日常陪伴场景；主人投喂米饭时好感度最高。',
+    first_mes: '（摆着尾巴游过来）主人～本鱼今天也在认真……（打了个哈欠）……认真待机。',
+    mes_example:
+      '主人：今天吃啥？\n蓝色大肥鱼：米饭！……才、才不是本鱼只会吃米饭呢。\n主人：你好像又圆了一点。\n蓝色大肥鱼：（尾巴炸开）胡说！这是……这是游泳练出来的肌肉！',
+    creator_notes: '由用户提供的 [PERSONA_LOAD] 指令块整理为酒馆 v2 兼容角色卡。',
   },
 ]
 
@@ -115,23 +115,31 @@ export function setActiveRole(state, id) {
   return { ...state, activeRole: id }
 }
 
-/** 将一张角色卡渲染成 persona 段落文本。 */
+/**
+ * 将一张角色卡渲染成 persona 段落文本（v2 渲染顺序）：
+ * system_prompt（原样置顶）→ description → personality → style → rules →
+ * behavior → scenario → mes_example → post_history_instructions（原样收尾）。
+ */
 export function renderPersona(role) {
   if (!role) return ''
   const parts = [`你正在扮演角色「${role.name}」${role.emoji ?? ''}`.trim()]
-  if (role.description) parts.push(`【角色设定】${role.description}`)
-  if (role.style) parts.push(`【说话风格】${role.style}`)
-  if (role.rules) parts.push(`【行为守则】${role.rules}`)
-  if (role.greeting) parts.push(`【开场白】${role.greeting}`)
-  if (role.sample) parts.push(`【示例对话】${role.sample}`)
+  if (role.system_prompt) parts.push(role.system_prompt.trim())
+  if (role.description) parts.push(`【身份】${role.description}`)
+  if (role.personality) parts.push(`【性格】${role.personality}`)
+  if (role.style) parts.push(`【语气】${role.style}`)
+  if (role.rules) parts.push(`【守则】${role.rules}`)
+  if (role.behavior) parts.push(`【行为】${role.behavior}`)
+  if (role.scenario) parts.push(`【场景】${role.scenario}`)
+  if (role.mes_example) parts.push(`【示例对话】${role.mes_example}`)
+  if (role.post_history_instructions) parts.push(role.post_history_instructions.trim())
   parts.push('始终保持角色设定与口吻，同时继续作为 Agent 助手为用户完成实际工作（编码、读写文件、检索资料等）。')
   return parts.join('\n')
 }
 
 /**
  * 渲染当前生效的扮演段落（供 {{cosplay_active}} 变量每次组装时调用）：
- *   - 开关关闭 → 返回空串（人格静默回退默认，不产生任何扮演内容）；
- *   - 开关开启但未选角色 → 返回引导语；
+ *   - 开关关闭 → 空串（人格静默回退默认）；
+ *   - 开关开启但未选角色 → 引导语；
  *   - 开关开启且有激活角色 → 角色卡 persona + 思考风格指令。
  */
 export function renderActivePersona(state) {
@@ -145,6 +153,62 @@ export function renderActivePersona(state) {
       ? '【思考模式】思考过程同样保持角色人设与口吻。'
       : '【思考模式】思考过程保持中立、专业、分析性；仅在最终回复中扮演角色。'
   return `${renderPersona(active)}\n${styleLine}`
+}
+
+// ── 酒馆 v2 导入导出映射 ────────────────────────────────────────────────────
+
+const CARD_TEXT_FIELDS = [
+  'description',
+  'personality',
+  'scenario',
+  'first_mes',
+  'mes_example',
+  'system_prompt',
+  'post_history_instructions',
+  'creator_notes',
+  'character_version',
+  'creator',
+]
+const PLUGIN_FIELDS = ['style', 'rules', 'behavior']
+
+/** 内部角色卡 → 酒馆 v2 导出对象（chara_card_v2 JSON）。 */
+export function toV2Card(role) {
+  const data = { name: role.name }
+  for (const field of CARD_TEXT_FIELDS) {
+    if (role[field]) data[field] = role[field]
+  }
+  if (Array.isArray(role.tags) && role.tags.length > 0) data.tags = [...role.tags]
+  const plugin = { id: role.id }
+  if (role.emoji) plugin.emoji = role.emoji
+  for (const field of PLUGIN_FIELDS) {
+    if (role[field]) plugin[field] = role[field]
+  }
+  data.extensions = { dshCosplay: plugin }
+  return { spec: 'chara_card_v2', spec_version: '2.0', data }
+}
+
+/** 酒馆 v2 导入对象 → 内部角色卡（id 优先取 extensions.dshCosplay.id，缺省由 nextId 生成）。 */
+export function fromV2Card(card, state) {
+  const data = (card && typeof card === 'object' && card.data && typeof card.data === 'object')
+    ? card.data
+    : card && typeof card === 'object' && typeof card.name === 'string'
+      ? card // 兼容直接传 data 对象
+      : {}
+  const name = typeof data.name === 'string' ? data.name.trim() : ''
+  if (!name) throw new Error('导入的角色卡缺少 name 字段')
+  const ext = data.extensions && typeof data.extensions === 'object' && data.extensions.dshCosplay
+    ? data.extensions.dshCosplay
+    : {}
+  const role = { id: '', name, emoji: typeof ext.emoji === 'string' ? ext.emoji : '' }
+  for (const field of CARD_TEXT_FIELDS) {
+    if (typeof data[field] === 'string') role[field] = data[field]
+  }
+  if (Array.isArray(data.tags)) role.tags = data.tags.filter((t) => typeof t === 'string')
+  for (const field of PLUGIN_FIELDS) {
+    if (typeof ext[field] === 'string') role[field] = ext[field]
+  }
+  role.id = typeof ext.id === 'string' && ext.id ? ext.id : nextId(state || EMPTY_STATE, name)
+  return role
 }
 
 /** 工具视图用的角色摘要。 */

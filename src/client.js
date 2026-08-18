@@ -20,7 +20,37 @@ window.__ModuleLoader__.load({
     const React = require('react')
     const { useSyncExternalStore, useState, useCallback } = React
 
-    const EMPTY_FORM = { name: '', emoji: '', description: '', style: '', rules: '', greeting: '', sample: '' }
+    const EMPTY_FORM = { name: '', emoji: '', system_prompt: '', description: '', personality: '', style: '', rules: '', behavior: '', scenario: '', first_mes: '', mes_example: '', creator_notes: '' }
+
+    // 酒馆 v2 导入导出映射（与主机侧 store.js 保持一致）
+    const CARD_TEXT_FIELDS = ['description', 'personality', 'scenario', 'first_mes', 'mes_example', 'system_prompt', 'post_history_instructions', 'creator_notes', 'character_version', 'creator']
+    const PLUGIN_FIELDS = ['style', 'rules', 'behavior']
+    function toV2Card(role) {
+      const data = { name: role.name }
+      for (const field of CARD_TEXT_FIELDS) if (role[field]) data[field] = role[field]
+      if (Array.isArray(role.tags) && role.tags.length > 0) data.tags = [...role.tags]
+      const plugin = { id: role.id }
+      if (role.emoji) plugin.emoji = role.emoji
+      for (const field of PLUGIN_FIELDS) if (role[field]) plugin[field] = role[field]
+      data.extensions = { dshCosplay: plugin }
+      return { spec: 'chara_card_v2', spec_version: '2.0', data }
+    }
+    function fromV2Card(card) {
+      const data = card && typeof card === 'object' && card.data && typeof card.data === 'object'
+        ? card.data
+        : card && typeof card === 'object' && typeof card.name === 'string'
+          ? card
+          : {}
+      const name = typeof data.name === 'string' ? data.name.trim() : ''
+      if (!name) throw new Error('导入的角色卡缺少 name 字段')
+      const ext = data.extensions && typeof data.extensions === 'object' && data.extensions.dshCosplay ? data.extensions.dshCosplay : {}
+      const role = { name, emoji: typeof ext.emoji === 'string' ? ext.emoji : '' }
+      for (const field of CARD_TEXT_FIELDS) if (typeof data[field] === 'string') role[field] = data[field]
+      if (Array.isArray(data.tags)) role.tags = data.tags.filter((t) => typeof t === 'string')
+      for (const field of PLUGIN_FIELDS) if (typeof ext[field] === 'string') role[field] = ext[field]
+      if (typeof ext.id === 'string' && ext.id) role.id = ext.id
+      return role
+    }
 
     const styles = {
       page: { display: 'flex', flexDirection: 'column', gap: '16px', padding: '4px 0', maxWidth: '720px' },
@@ -143,7 +173,7 @@ window.__ModuleLoader__.load({
         setEditingId(role ? role.id : null)
         setForm(
           role
-            ? { name: role.name, emoji: role.emoji ?? '', description: role.description ?? '', style: role.style ?? '', rules: role.rules ?? '', greeting: role.greeting ?? '', sample: role.sample ?? '' }
+            ? { name: role.name, emoji: role.emoji ?? '', system_prompt: role.system_prompt ?? '', description: role.description ?? '', personality: role.personality ?? '', style: role.style ?? '', rules: role.rules ?? '', behavior: role.behavior ?? '', scenario: role.scenario ?? '', first_mes: role.first_mes ?? '', mes_example: role.mes_example ?? '', creator_notes: role.creator_notes ?? '' }
             : EMPTY_FORM,
         )
       }, [])
@@ -165,6 +195,30 @@ window.__ModuleLoader__.load({
           reportError(error)
         }
       }, [form, editingId, value, store, reportError])
+
+      const exportRole = useCallback(async (role) => {
+        const json = JSON.stringify(toV2Card(role), null, 2)
+        const blob = new Blob([json], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${role.name || role.id || 'character'}.json`
+        a.click()
+        URL.revokeObjectURL(url)
+      }, [])
+
+      const importFileRef = React.useRef(null)
+      const importRole = useCallback(async (file) => {
+        try {
+          const text = await file.text()
+          const card = fromV2Card(JSON.parse(text))
+          await store.mutate((r) => r.upsertRole(card))
+          if (!value?.activeRole) await store.mutate((r) => r.setActiveRole(card.id ?? null))
+          if (importFileRef.current) importFileRef.current.value = ''
+        } catch (error) {
+          reportError(error)
+        }
+      }, [store, value, reportError])
 
       const remove = useCallback(async (id) => {
         if (typeof window !== 'undefined' && !window.confirm(`确定删除角色 ${id} 吗？`)) return
@@ -285,6 +339,8 @@ window.__ModuleLoader__.load({
           React.createElement('div', { style: styles.row },
             React.createElement('div', { style: styles.title }, '角色库'),
             React.createElement('button', { style: styles.buttonPrimary, onClick: () => beginEdit(null) }, '＋ 新建角色'),
+            React.createElement('button', { style: styles.button, onClick: () => importFileRef.current?.click() }, '导入角色卡'),
+            React.createElement('input', { ref: importFileRef, type: 'file', accept: '.json,application/json', style: { display: 'none' }, onChange: (e) => { if (e.target.files?.[0]) importRole(e.target.files[0]) } }),
           ),
           roles.length === 0
             ? React.createElement('div', { style: styles.hint }, '角色库为空。点击「新建角色」创建第一个角色，或用 cosplay_upsert 工具。')
@@ -302,6 +358,7 @@ window.__ModuleLoader__.load({
                     React.createElement('span', { style: { ...styles.hint, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, role.description ?? ''),
                     React.createElement('button', { style: styles.button, onClick: () => setActive(role.id) }, '设为当前'),
                     React.createElement('button', { style: styles.button, onClick: () => beginEdit(role) }, '编辑'),
+                    React.createElement('button', { style: styles.button, onClick: () => exportRole(role) }, '导出'),
                     React.createElement('button', { style: styles.button, onClick: () => remove(role.id) }, '删除'),
                   ),
                 ),
@@ -323,8 +380,20 @@ window.__ModuleLoader__.load({
           React.createElement(
             'div',
             { style: styles.row },
-            React.createElement('span', { style: styles.label }, '设定 *'),
-            React.createElement('textarea', { style: styles.textarea, value: form.description, onChange: (e) => setField('description', e.target.value), placeholder: '角色背景与性格（我是谁）' }),
+            React.createElement('span', { style: styles.label }, '指令块'),
+            React.createElement('textarea', { style: { ...styles.textarea, minHeight: '96px' }, value: form.system_prompt, onChange: (e) => setField('system_prompt', e.target.value), placeholder: '可选：原样注入 persona 顶部的指令块（如 [PERSONA_LOAD] 格式）' }),
+          ),
+          React.createElement(
+            'div',
+            { style: styles.row },
+            React.createElement('span', { style: styles.label }, '身份'),
+            React.createElement('textarea', { style: styles.textarea, value: form.description, onChange: (e) => setField('description', e.target.value), placeholder: '身份与背景设定（我是谁）' }),
+          ),
+          React.createElement(
+            'div',
+            { style: styles.row },
+            React.createElement('span', { style: styles.label }, '性格'),
+            React.createElement('textarea', { style: styles.textarea, value: form.personality, onChange: (e) => setField('personality', e.target.value), placeholder: '性格核心与层次' }),
           ),
           React.createElement(
             'div',
@@ -341,14 +410,32 @@ window.__ModuleLoader__.load({
           React.createElement(
             'div',
             { style: styles.row },
-            React.createElement('span', { style: styles.label }, '开场白'),
-            React.createElement('input', { style: styles.input, value: form.greeting, onChange: (e) => setField('greeting', e.target.value), placeholder: '可选' }),
+            React.createElement('span', { style: styles.label }, '行为'),
+            React.createElement('textarea', { style: styles.textarea, value: form.behavior, onChange: (e) => setField('behavior', e.target.value), placeholder: '行为模式 / 私密互动' }),
+          ),
+          React.createElement(
+            'div',
+            { style: styles.row },
+            React.createElement('span', { style: styles.label }, '场景'),
+            React.createElement('textarea', { style: styles.textarea, value: form.scenario, onChange: (e) => setField('scenario', e.target.value), placeholder: '场景 / 世界观 / 关系设定' }),
           ),
           React.createElement(
             'div',
             { style: styles.row },
             React.createElement('span', { style: styles.label }, '示例对话'),
-            React.createElement('textarea', { style: styles.textarea, value: form.sample, onChange: (e) => setField('sample', e.target.value), placeholder: '可选：few-shot 示例' }),
+            React.createElement('textarea', { style: styles.textarea, value: form.mes_example, onChange: (e) => setField('mes_example', e.target.value), placeholder: '可选：few-shot 示例' }),
+          ),
+          React.createElement(
+            'div',
+            { style: styles.row },
+            React.createElement('span', { style: styles.label }, '开场白'),
+            React.createElement('input', { style: styles.input, value: form.first_mes, onChange: (e) => setField('first_mes', e.target.value), placeholder: '可选' }),
+          ),
+          React.createElement(
+            'div',
+            { style: styles.row },
+            React.createElement('span', { style: styles.label }, '备注'),
+            React.createElement('input', { style: styles.input, value: form.creator_notes, onChange: (e) => setField('creator_notes', e.target.value), placeholder: '创建者笔记（不注入人格）' }),
           ),
           React.createElement(
             'div',

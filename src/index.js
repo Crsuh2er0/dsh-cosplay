@@ -39,11 +39,22 @@ const RoleCardSchema = z.object({
   id: z.string().required(),
   name: z.string().required(),
   emoji: z.string().default(''),
-  description: z.string().required(),
+  // SillyTavern v2 标准字段（通用共享）
+  description: z.string().default(''),
+  personality: z.string().default(''),
+  scenario: z.string().default(''),
+  first_mes: z.string().default(''),
+  mes_example: z.string().default(''),
+  system_prompt: z.string().default(''),
+  post_history_instructions: z.string().default(''),
+  creator_notes: z.string().default(''),
+  character_version: z.string().default(''),
+  creator: z.string().default(''),
+  tags: z.array(z.string()).default([]),
+  // 插件扩展字段（导出归入 extensions.dshCosplay）
   style: z.string().default(''),
   rules: z.string().default(''),
-  greeting: z.string().default(''),
-  sample: z.string().default(''),
+  behavior: z.string().default(''),
 })
 
 // schemastery 无 null 类型：activeRole 以空串表示"未选择"（存储层），
@@ -301,16 +312,20 @@ export function apply(ctx) {
   ctx.tools.register(defineTool({
     name: 'cosplay_upsert',
     description:
-      '创建或更新一个角色（角色库管理，开关关闭时也可用）。未提供 id 时创建新角色（按 name 生成 id）；提供 id 时更新既有角色。支持用户随时自定义任何角色。',
+      '创建或更新一个角色（角色库管理，开关关闭时也可用）。未提供 id 时创建新角色（按 name 生成 id）；提供 id 时更新既有角色。字段兼容酒馆（SillyTavern）v2 角色卡。支持用户随时自定义任何角色。',
     parameters: {
       id: { type: 'string', description: '既有角色 id；省略表示新建。' },
       name: { type: 'string', required: true, description: '角色显示名。' },
-      emoji: { type: 'string', description: '头像字符（如 📚）。' },
-      description: { type: 'string', required: true, description: '角色背景与性格设定（我是谁）。' },
+      emoji: { type: 'string', description: '头像字符（如 🐋）。' },
+      system_prompt: { type: 'string', description: '原样注入 persona 顶部的指令块（如 [PERSONA_LOAD] 格式）。' },
+      description: { type: 'string', description: '身份与背景设定（我是谁）。' },
+      personality: { type: 'string', description: '性格核心与层次。' },
       style: { type: 'string', description: '说话风格（怎么说话）。' },
       rules: { type: 'string', description: '行为守则（该做什么 / 不做什么）。' },
-      greeting: { type: 'string', description: '开场白。' },
-      sample: { type: 'string', description: '示例对话（few-shot）。' },
+      behavior: { type: 'string', description: '行为模式 / 私密互动。' },
+      scenario: { type: 'string', description: '场景 / 世界观 / 关系设定。' },
+      first_mes: { type: 'string', description: '开场白。' },
+      mes_example: { type: 'string', description: '示例对话（few-shot）。' },
     },
     output: textOutput,
     async execute(args) {
