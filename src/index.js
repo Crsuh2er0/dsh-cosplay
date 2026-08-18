@@ -264,11 +264,14 @@ export function apply(ctx) {
   })
 
   // ── 内置 skill：自然语言创建角色卡（全局注册，模型可加载） ───────────────
+  // source 必须显式提供：register() 只默认 invocation/provider，加载路径会
+  // 校验 source 必须为字符串（缺失报 "loaded skill ... source must be a string"）。
   ctx.skills.register({
     name: CARD_AUTHORING_SKILL_NAME,
     description: CARD_AUTHORING_SKILL_DESCRIPTION,
     whenToUse: CARD_AUTHORING_SKILL_WHEN_TO_USE,
     content: CARD_AUTHORING_SKILL_CONTENT,
+    source: 'runtime',
   })
 
   // ── 全局工具（模式门控：开关关闭时 switch 软禁用） ────────────────────────
