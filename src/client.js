@@ -1,16 +1,18 @@
 /**
  * dsh-cosplay — 浏览器侧（dsh.client 声明，包入口 dsh-cosplay/client）。
  *
- * 设置页新增「角色扮演」页（settings.section 列表条目，与 General / Models /
- * Plugins 同级），承载：
+ * 设置页新增「角色扮演」页（settings.section 列表条目），承载：
  *   - 全局开关（enabled）；
  *   - 角色库管理：列表 / 激活 / 新建 / 编辑 / 删除；
  *   - 角色卡字段：name / emoji / description / style / rules / greeting / sample。
  *
- * 数据通道：ctx.settingsScope.bind({ namespace: 'cosplay' }) ——
- * dsh-client-ui-settings 提供的 Host 传输（快照 + 按 revision 栅栏写入），
- * 组件经 useSyncExternalStore 订阅快照。格式为 __ModuleLoader__ 的 CJS-factory
- * 形式（与内置客户端包一致）。
+ * 数据通道：插件自有的 typert Remote 命名空间 `cosplay`（dsh-at-file 同款模式）
+ * —— settings 命名空间对 Web 配置客户端有硬编码暴露白名单（dsh-host-apiproxy），
+ * 第三方命名空间默认不可远程读写，因此设置页不走 settingsScope，而是
+ * `ctx.remote.$mount({ package, descriptors })` + `ctx.reflect.get('remote.cosplay')`
+ * 调用主机侧 @Remote 方法。codec 用 { mode: 'src-json' }，无需 zod。
+ *
+ * 格式为 __ModuleLoader__ 的 CJS-factory 形式（与内置客户端包一致）。
  */
 window.__ModuleLoader__.load({
   id: 'dsh-cosplay',
@@ -18,7 +20,6 @@ window.__ModuleLoader__.load({
     const React = require('react')
     const { useSyncExternalStore, useState, useCallback } = React
 
-    const NAMESPACE = 'cosplay'
     const EMPTY_FORM = { name: '', emoji: '', description: '', style: '', rules: '', greeting: '', sample: '' }
 
     const styles = {
@@ -38,33 +39,96 @@ window.__ModuleLoader__.load({
       label: { fontSize: '12px', opacity: 0.6, minWidth: '64px' },
     }
 
+    // ── typert Remote 描述符（与主机侧 COSPLAY_INVOCATIONS 一致） ────────────
+    const COSPLAY_INVOCATIONS = [
+      { id: 'dsh-cosplay#cosplay/getState', service: 'cosplay', namespace: 'cosplay', method: 'getState', invocation: { kind: 'direct' }, parameters: [], result: { mode: 'src-json' } },
+      { id: 'dsh-cosplay#cosplay/upsertRole', service: 'cosplay', namespace: 'cosplay', method: 'upsertRole', invocation: { kind: 'direct' }, parameters: [{ name: 'card', wire: 'card', source: 'json', codec: { mode: 'src-json' } }], result: { mode: 'src-json' } },
+      { id: 'dsh-cosplay#cosplay/removeRole', service: 'cosplay', namespace: 'cosplay', method: 'removeRole', invocation: { kind: 'direct' }, parameters: [{ name: 'id', wire: 'id', source: 'json', codec: { mode: 'src-json' } }], result: { mode: 'src-json' } },
+      { id: 'dsh-cosplay#cosplay/setActiveRole', service: 'cosplay', namespace: 'cosplay', method: 'setActiveRole', invocation: { kind: 'direct' }, parameters: [{ name: 'id', wire: 'id', source: 'json', codec: { mode: 'src-json' } }], result: { mode: 'src-json' } },
+      { id: 'dsh-cosplay#cosplay/setEnabled', service: 'cosplay', namespace: 'cosplay', method: 'setEnabled', invocation: { kind: 'direct' }, parameters: [{ name: 'enabled', wire: 'enabled', source: 'json', codec: { mode: 'src-json' } }], result: { mode: 'src-json' } },
+    ]
+    const COSPLAY_REMOTE = { package: 'dsh-cosplay', descriptors: COSPLAY_INVOCATIONS }
+
+    /** 挂载后返回 Remote 命名空间；未就绪返回 undefined。 */
+    function createCosplayStore(getRemote) {
+      let snapshot = { status: 'loading', value: undefined }
+      const listeners = new Set()
+      const emit = () => {
+        for (const listener of [...listeners]) listener()
+      }
+      const settle = (next) => {
+        snapshot = next
+        emit()
+      }
+      const call = async (fn) => {
+        const remote = getRemote()
+        if (remote === undefined) {
+          settle({ status: 'unavailable', value: undefined, error: 'cosplay Remote 未挂载' })
+          return undefined
+        }
+        try {
+          return await fn(remote)
+        } catch (error) {
+          settle({ status: 'unavailable', value: undefined, error: String(error && error.message ? error.message : error) })
+          return undefined
+        }
+      }
+      return {
+        subscribe: (listener) => {
+          listeners.add(listener)
+          return () => listeners.delete(listener)
+        },
+        getSnapshot: () => snapshot,
+        async load() {
+          const res = await call((r) => r.getState())
+          if (res === undefined) return
+          if (res.ok) settle({ status: 'ready', value: res.value })
+          else settle({ status: 'unavailable', value: undefined, error: res.error?.message ?? '读取失败' })
+        },
+        /** 执行一次写操作；成功后用返回值刷新快照。 */
+        async mutate(fn) {
+          const res = await call(fn)
+          if (res === undefined) return undefined
+          if (res.ok) {
+            settle({ status: 'ready', value: res.value })
+            return res.value
+          }
+          throw new Error(res.error?.message ?? '写入失败')
+        },
+      }
+    }
+
     return {
       name: 'cosplay-client',
-      inject: ['slots', 'connection', 'remote', 'settingsScope'],
+      inject: ['remote', 'slots', 'connection'],
       apply(ctx) {
-        const scope = ctx.settingsScope.bind({ namespace: NAMESPACE })
+        let cosplayRemote = undefined
+        const store = createCosplayStore(() => cosplayRemote)
         const slots = ctx.get('slots')
         if (slots === undefined) return
+        ctx.effect(async () => {
+          const dispose = await ctx.remote.$mount(COSPLAY_REMOTE)
+          cosplayRemote = ctx.reflect.get('remote.cosplay')
+          if (cosplayRemote === undefined) {
+            throw new Error('dsh-cosplay: the cosplay Remote namespace did not mount')
+          }
+          void store.load()
+          return dispose
+        }, 'dsh-cosplay: remote mount')
         slots.inject('settings.section', () =>
           slots.register(
             { name: 'settings.section', id: 'cosplay', order: 100, label: '角色扮演' },
-            () => React.createElement(CosplaySection, { scope }),
+            () => React.createElement(CosplaySection, { store }),
           ),
         )
       },
     }
 
-    function CosplaySection({ scope }) {
-      // scope 的 subscribe/getSnapshot 是基于 this 的方法：必须用箭头函数包一层，
-      // 否则裸引用传给 useSyncExternalStore 会以 undefined this 调用而抛错。
-      const snapshot = useSyncExternalStore(
-        (listener) => scope.subscribe(listener),
-        () => scope.getSnapshot(),
-      )
+    function CosplaySection({ store }) {
+      // store 的 subscribe/getSnapshot 是闭包函数（非 this 方法），可安全裸引用
+      const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot)
       const value = snapshot.value
-      const writable = snapshot.writable !== false
 
-      // 编辑表单状态
       const [editingId, setEditingId] = useState(null) // null = 新建
       const [form, setForm] = useState(EMPTY_FORM)
 
@@ -79,37 +143,58 @@ window.__ModuleLoader__.load({
         )
       }, [])
 
+      const reportError = useCallback((error) => {
+        if (typeof window !== 'undefined') window.alert(error.message)
+      }, [])
+
       const save = useCallback(async () => {
         if (!form.name.trim()) return
-        const roles = value?.roles ?? []
-        const next = editingId
-          ? roles.map((r) => (r.id === editingId ? { ...r, ...form, name: form.name.trim(), id: editingId } : r))
-          : [...roles, { ...form, name: form.name.trim() }] // id 由主机侧生成
-        await scope.set('roles', next)
-        if (!editingId && !value?.activeRole) await scope.set('activeRole', next[next.length - 1].id)
-        setEditingId(null)
-        setForm(EMPTY_FORM)
-      }, [form, editingId, value, scope])
+        try {
+          const card = { ...form, name: form.name.trim() }
+          if (editingId) card.id = editingId
+          await store.mutate((r) => r.upsertRole(card))
+          if (!editingId && !value?.activeRole) await store.mutate((r) => r.setActiveRole(card.id ?? null))
+          setEditingId(null)
+          setForm(EMPTY_FORM)
+        } catch (error) {
+          reportError(error)
+        }
+      }, [form, editingId, value, store, reportError])
 
       const remove = useCallback(async (id) => {
         if (typeof window !== 'undefined' && !window.confirm(`确定删除角色 ${id} 吗？`)) return
-        await scope.set('roles', (value?.roles ?? []).filter((r) => r.id !== id))
-        if (value?.activeRole === id) await scope.unset('activeRole') // 清空用 unset（回退 schema 默认）
-      }, [value, scope])
+        try {
+          await store.mutate((r) => r.removeRole(id))
+        } catch (error) {
+          reportError(error)
+        }
+      }, [store, reportError])
 
       const setActive = useCallback(async (id) => {
-        await scope.set('activeRole', id)
-      }, [scope])
+        try {
+          await store.mutate((r) => r.setActiveRole(id))
+        } catch (error) {
+          reportError(error)
+        }
+      }, [store, reportError])
 
       const toggle = useCallback(async () => {
-        await scope.set('enabled', !(value?.enabled === true))
-      }, [value, scope])
+        try {
+          await store.mutate((r) => r.setEnabled(!(value?.enabled === true)))
+        } catch (error) {
+          reportError(error)
+        }
+      }, [store, value, reportError])
 
       if (snapshot.status === 'loading') {
         return React.createElement('div', { style: styles.hint }, '角色扮演设置加载中…')
       }
       if (snapshot.status === 'unavailable') {
-        return React.createElement('div', { style: styles.hint }, '角色库不可用：settings 服务未暴露命名空间 cosplay。')
+        return React.createElement(
+          'div',
+          { style: styles.hint },
+          `角色库不可用：cosplay Remote 通道未就绪。${snapshot.error ? `（${snapshot.error}）` : ''}`,
+        )
       }
 
       const enabled = value?.enabled === true
@@ -134,7 +219,7 @@ window.__ModuleLoader__.load({
                 'span',
                 {
                   style: { ...styles.switchBox, background: enabled ? 'var(--dsw-specific-accent, #4d6bfe)' : styles.switchBox.background },
-                  onClick: writable ? toggle : undefined,
+                  onClick: toggle,
                 },
                 React.createElement('span', { style: { ...styles.switchKnob, left: enabled ? '19px' : '3px' } }),
               ),
@@ -143,7 +228,7 @@ window.__ModuleLoader__.load({
             React.createElement(
               'span',
               { style: styles.hint },
-              writable ? '开启后，所有会话（含子代理）将以当前激活角色的设定与语气对话；关闭后下一轮对话即回退默认人格。' : '（当前为只读/内存模式，无法写入）',
+              '开启后，所有会话（含子代理）将以当前激活角色的设定与语气对话；关闭后下一轮对话即回退默认人格。',
             ),
           ),
           React.createElement(
@@ -162,7 +247,7 @@ window.__ModuleLoader__.load({
           { style: styles.card },
           React.createElement('div', { style: styles.row },
             React.createElement('div', { style: styles.title }, '角色库'),
-            React.createElement('button', { style: styles.buttonPrimary, onClick: writable ? () => beginEdit(null) : undefined }, '＋ 新建角色'),
+            React.createElement('button', { style: styles.buttonPrimary, onClick: () => beginEdit(null) }, '＋ 新建角色'),
           ),
           roles.length === 0
             ? React.createElement('div', { style: styles.hint }, '角色库为空。点击「新建角色」创建第一个角色，或用 cosplay_upsert 工具。')
@@ -178,9 +263,9 @@ window.__ModuleLoader__.load({
                       ? React.createElement('span', { style: styles.badge }, '当前')
                       : null,
                     React.createElement('span', { style: { ...styles.hint, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, role.description ?? ''),
-                    React.createElement('button', { style: styles.button, onClick: writable ? () => setActive(role.id) : undefined }, '设为当前'),
-                    React.createElement('button', { style: styles.button, onClick: writable ? () => beginEdit(role) : undefined }, '编辑'),
-                    React.createElement('button', { style: styles.button, onClick: writable ? () => remove(role.id) : undefined }, '删除'),
+                    React.createElement('button', { style: styles.button, onClick: () => setActive(role.id) }, '设为当前'),
+                    React.createElement('button', { style: styles.button, onClick: () => beginEdit(role) }, '编辑'),
+                    React.createElement('button', { style: styles.button, onClick: () => remove(role.id) }, '删除'),
                   ),
                 ),
               ),
@@ -231,7 +316,7 @@ window.__ModuleLoader__.load({
           React.createElement(
             'div',
             { style: styles.row },
-            React.createElement('button', { style: styles.buttonPrimary, onClick: writable ? save : undefined }, '保存'),
+            React.createElement('button', { style: styles.buttonPrimary, onClick: save }, '保存'),
             editingId ? React.createElement('button', { style: styles.button, onClick: () => { setEditingId(null); setForm(EMPTY_FORM) } }, '取消') : null,
           ),
         ),

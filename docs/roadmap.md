@@ -24,7 +24,7 @@
 | D4 | **工具软禁用** | 全局注册 `cosplay_show/list/switch/upsert/remove`；`cosplay_switch` 在开关关闭时返回"请先开启"；角色库管理工具（list/show/upsert/remove）始终可用 |
 | D5 | **默认关闭（opt-in）** | 安装后默认不扮演，用户主动开启；内置示例角色（小林 / 前辈酱）种子写入，角色库管理在关闭时也可用 |
 | D6 | **不安装、不依赖任何预设** | 独立「Cosplay 模式」预设已移除（用户确认）；无 preset 行、无 preset/ 目录 |
-| D7 | **设置页「角色扮演」= `settings.section` 条目** | 与 General / Models / Plugins 同级；承载开关 + 角色 CRUD；数据通道 `ctx.settingsScope.bind({namespace:'cosplay'})`（dsh-client-ui-settings 的 Host 传输）+ `useSyncExternalStore` |
+| D7 | **设置页「角色扮演」= `settings.section` 条目，数据走 typert Remote** | 与 General / Models / Plugins 同级。**数据通道**：settings 命名空间对 Web 配置客户端有硬编码暴露白名单（dsh-host-apiproxy 的 WEB/PRODUCT_SETTINGS_NAMESPACES，第三方命名空间默认不可远程读写），因此设置页**不走 settingsScope**，改为插件自有的 typert Remote 命名空间 `cosplay`（`ctx.remote.$mount` + `ctx.reflect.get('remote.cosplay')`，dsh-at-file 同款模式），codec 用 `{ mode: 'src-json' }` 免 zod |
 | D8 | **纯 JS ESM，无构建步骤** | 主机面普通 ESM；浏览器面 `__ModuleLoader__` CJS-factory（经 `dsh.client` 声明装载）；依赖 schemastery + 4 个盒内 peer 包 |
 
 ## 需求 → 机制映射
