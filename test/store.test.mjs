@@ -9,6 +9,7 @@ import {
   DEFAULT_ROLES,
   normalizeState,
   findRole,
+  nextId,
   upsertRole,
   removeRole,
   setActiveRole,
@@ -60,6 +61,16 @@ test('upsertRole 新建 / 更新 / id 生成', () => {
   assert.equal(updated.roles[0].description, 'e')
 
   assert.throws(() => upsertRole(EMPTY_STATE, { name: '  ', description: 'd' }), /不能为空/)
+})
+
+test('upsertRole id 确定性（工具路径：先算 id 再传入，findRole 必命中）', () => {
+  // 复现线上 bug：中文名新建角色时，事后按 name 重算 id 会得到不同随机 id
+  const id = nextId(EMPTY_STATE, '庄方宜')
+  const next = upsertRole(EMPTY_STATE, { id, name: '庄方宜', description: 'd' })
+  assert.equal(findRole(next, id).name, '庄方宜') // 用同一 id 查找必命中
+  // 未提供 id 时 upsertRole 自生成的 id 也能从状态中找到
+  const auto = upsertRole(EMPTY_STATE, { name: '庄方宜', description: 'd' })
+  assert.ok(findRole(auto, auto.roles[0].id))
 })
 
 test('removeRole / setActiveRole', () => {

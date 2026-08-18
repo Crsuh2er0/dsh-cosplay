@@ -28,6 +28,7 @@ import {
   removeRole,
   setActiveRole,
   findRole,
+  nextId,
   renderActivePersona,
   renderPersona,
 } from './store.js'
@@ -348,9 +349,12 @@ export function apply(ctx) {
     output: textOutput,
     async execute(args) {
       const state = read()
-      const next = upsertRole(state, args)
+      // id 必须先算并传入：upsertRole 只在未提供 id 时生成，且生成带随机后缀；
+      // 事后重算（如按 name）会得到不同 id，导致 findRole 落空、响应报错。
+      const id = args.id || nextId(state, args.name)
+      const next = upsertRole(state, { ...args, id })
       await write(next)
-      const role = findRole(next, args.id || nextIdOf(next, args.name))
+      const role = findRole(next, id)
       return `已保存角色「${role.name}」(${role.id})。`
     },
   }))
@@ -372,12 +376,4 @@ export function apply(ctx) {
 
   // TEMP-DIAG: 激活标记（定位后移除）
   console.log('[dsh-cosplay] cosplay-core activated; typert manifest registered')
-}
-
-/** 新建角色的实际 id（与 store.nextId 的生成规则保持一致）。 */
-function nextIdOf(state, name) {
-  const slug = String(name).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-  return slug && !state.roles.some((r) => r.id === slug)
-    ? slug
-    : `${slug || 'role'}-${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`
 }

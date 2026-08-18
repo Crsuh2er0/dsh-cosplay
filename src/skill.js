@@ -43,4 +43,6 @@ export const CARD_AUTHORING_SKILL_CONTENT = `# 角色卡创作规范（dsh-cospl
 ## 注意
 - 用户后续说"再改一下 / 加点…"：用 cosplay_upsert 传同一 id 更新，不要新建。
 - 不确定的设定宁可留空或写进 creator_notes，不要编造细节。
+- **严禁直接编辑任何配置文件**（包括 $DSH_HOME/settings.yaml、profile 目录等）——角色库只能通过 cosplay_upsert / cosplay_remove 工具读写；也不要复制或重写角色库的完整段落。
+- cosplay_upsert 返回的文本即写入结果（含角色 id）；若工具报错，**把错误原样报告给用户**，不要自行手改配置文件"补救"。
 `
