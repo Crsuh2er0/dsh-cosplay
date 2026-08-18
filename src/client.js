@@ -55,7 +55,12 @@ window.__ModuleLoader__.load({
     }
 
     function CosplaySection({ scope }) {
-      const snapshot = useSyncExternalStore(scope.subscribe, scope.getSnapshot)
+      // scope 的 subscribe/getSnapshot 是基于 this 的方法：必须用箭头函数包一层，
+      // 否则裸引用传给 useSyncExternalStore 会以 undefined this 调用而抛错。
+      const snapshot = useSyncExternalStore(
+        (listener) => scope.subscribe(listener),
+        () => scope.getSnapshot(),
+      )
       const value = snapshot.value
       const writable = snapshot.writable !== false
 
