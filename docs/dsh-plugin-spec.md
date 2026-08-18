@@ -145,3 +145,22 @@ $DSH_HOME/.agent-presets/cosplay/
 | persona 行 | `node_modules/@deepseek-ai/dsh-persona/lib/index.js` |
 | preset 示例 | `config/agent-presets/standard/` |
 | 插件包示例 | `node_modules/@deepseek-ai/dsh-tool-todo/package.json` |
+
+## 7. 第三方 bundle 实践补充（dsh-cosplay 采用的变体）
+
+- **纯 JS ESM 包**：不强制 TypeScript。`main`/`exports` 直接指向 `src/*.js`，
+  `files` 白名单含 `src/` 与 `preset/`，无需构建步骤。
+- **双半区声明**：`package.json` 的 `"dsh": { "bundle": { "patch": "..." },
+  "client": { "platform": "web", "inject": [...] } }` —— 一个组合行即同时承载
+  主机半区（包主入口）与浏览器半区（`exports["./client"]`），后者由
+  `dsh-client-modules` 扫描装载。
+- **浏览器半区格式**：必须是 `window.__ModuleLoader__.load({ id, factory:
+  (require) => {...} })` 的 CJS-factory 格式（与内置客户端包一致）；React 通过
+  `require('react')` 获取，Slots 服务经 `ctx.get('slots')` 消费。
+- **设置页新增项**：`settings.section`（list 协议，`{name, id, order, label}`）
+  的每个条目就是一个设置页/侧边栏项，与 General / Models / Plugins 同级。
+- **服务提供**：`ctx.provide(name, value)`（dsh-app-boot 的 `dshHomePath` 同款），
+  返回的 disposer 随 fiber 自动清理。
+- **客户端读设置**：settings 命名空间的浏览器镜像走 `dsh-client-ui-settings` 的
+  settings scope（`attachSettings`）机制，经连接层与主机文档同步。
+

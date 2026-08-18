@@ -1,27 +1,23 @@
 {
   "name": "dsh-cosplay",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Cosplay mode for DeepSeek Harness: turn the agent into any character you define, with a settings UI for role configuration and management.",
   "type": "module",
-  "main": "lib/index.js",
-  "types": "lib/types/index.d.ts",
+  "main": "src/index.js",
   "exports": {
-    ".": {
-      "types": "./lib/types/index.d.ts",
-      "default": "./lib/index.js"
-    },
-    "./src/*": "./src/*",
+    ".": "./src/index.js",
+    "./preset": "./src/preset.js",
+    "./client": "./src/client.js",
     "./package.json": "./package.json"
   },
   "files": [
-    "lib/",
-    "cordis.patch.yml",
-    "preset/"
+    "src/",
+    "preset/",
+    "cordis.patch.yml"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepublishOnly": "npm run build"
+    "test": "node test/store.test.mjs",
+    "check": "node --check src/store.js && node --check src/index.js && node --check src/preset.js && node --check src/client.js"
   },
   "keywords": [
     "dsh",
@@ -35,13 +31,21 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime"
+      ]
     }
   },
-  "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1"
+  "dependencies": {
+    "@deepseek-ai/dsh-home-paths": "^0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "^3.18.1"
   },
-  "devDependencies": {
+  "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
-    "typescript": "^5.9.0"
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.6"
   }
 }
