@@ -312,7 +312,7 @@ window.__ModuleLoader__.load({
               ? activeRole
                 ? `当前扮演：${roles.find((r) => r.id === activeRole)?.name ?? activeRole}`
                 : '已开启但未选择角色 —— 请在下方的角色列表中「设为当前」。'
-              : '默认关闭：开启后才生效（opt-in）。',
+              : '已关闭：开启后生效。',
           ),
           // ── 思考风格（全局） ──
           React.createElement(
@@ -334,8 +334,8 @@ window.__ModuleLoader__.load({
             'div',
             { style: styles.hint },
             thinkingStyle !== 'role'
-              ? '中立思考：模型思考过程保持专业分析，仅最终回复扮演角色（推荐，保障 Agent 工作能力）。'
-              : '角色化思考：模型的思考过程也保持角色人设与口吻（全沉浸；笨角色可能影响任务能力）。',
+              ? '中立思考：模型思考过程保持专业分析，仅最终回复扮演角色（推荐）。'
+              : '角色化思考：模型的思考过程也保持角色人设与口吻，沉浸感更强（不稳定触发，可能影响Agent任务能力，谨慎开启）。',
           ),
         ),
         // ── 角色列表 ──
@@ -387,7 +387,7 @@ window.__ModuleLoader__.load({
             'div',
             { style: styles.row },
             React.createElement('span', { style: styles.label }, '系统提示词'),
-            React.createElement('textarea', { style: { ...styles.textarea, minHeight: '96px' }, value: form.system_prompt, onChange: (e) => setField('system_prompt', e.target.value), placeholder: '可选：v2 标准 system_prompt 字段，原样注入 persona 顶部（如 [PERSONA_LOAD] 指令块）' }),
+            React.createElement('textarea', { style: { ...styles.textarea, minHeight: '96px' }, value: form.system_prompt, onChange: (e) => setField('system_prompt', e.target.value), placeholder: '可选：给角色附加总体扮演指令。' }),
           ),
           React.createElement(
             'div',

@@ -54,6 +54,22 @@ dsh --profile web-e2e --port 3081
 # （建议只查看设置，不在该实例中打开会话，避免双实例并发写会话日志）
 ```
 
+### 修改代码后重跑 e2e 实例
+
+插件以"实体复制"方式装进 e2e profile，改代码后需**同步 + 重启**：
+
+```powershell
+# 一键：同步 F:\dsh-cosplay → e2e profile 并重启 3081（前台阻塞，Ctrl+C 停止）
+powershell -ExecutionPolicy Bypass -File .\scripts\e2e-restart.ps1
+
+# 或手动两步：
+# 1) robocopy F:\dsh-cosplay "$env:USERPROFILE\.dsh\profiles\web-e2e\node_modules\dsh-cosplay" /E /XD .git node_modules
+# 2) 杀掉 3081 旧进程后：dsh --profile web-e2e --port 3081
+```
+
+> 客户端 bundle 在启动时构建，改 client.js 也必须重启（不要只刷新页面）。
+> 若 e2e 实例由 agent 会话托管，脚本会把它停掉——重启后告知 agent 即可。
+
 ## 发布（后续轮次）
 
 - [ ] `npm.cmd pack` 生成 tarball（已可离线执行）
