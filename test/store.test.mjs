@@ -17,6 +17,7 @@ import {
   roleSummary,
   toV2Card,
   fromV2Card,
+  applyThinkingDirective,
 } from '../src/store.js'
 
 test('normalizeState 规整任意输入（含 enabled / thinkingStyle）', () => {
@@ -99,15 +100,12 @@ test('renderPersona / renderActivePersona（开关门控）', () => {
   const onNoRole = { ...EMPTY_STATE, enabled: true }
   assert.ok(renderActivePersona(onNoRole).includes('未选择角色'))
 
-  // 开启 + 激活角色：角色卡 + 思考风格指令（默认 neutral）
+  // 开启 + 激活角色：角色卡（思考指令已移出 persona，改由 pre-step 注入）
   const onActive = { ...offActive, enabled: true }
   const persona = renderActivePersona(onActive)
   assert.ok(persona.includes('A'))
-  assert.ok(persona.includes('思考过程保持中立'))
-
-  // 角色化思考
-  const onRoleThinking = { ...onActive, thinkingStyle: 'role' }
-  assert.ok(renderActivePersona(onRoleThinking).includes('思考过程同样保持角色人设'))
+  assert.ok(!persona.includes('【思考模式】'))
+  assert.equal(renderActivePersona({ ...onActive, thinkingStyle: 'role' }), persona) // 思考风格不影响 persona 文本
 })
 
 test('roleSummary', () => {
@@ -158,4 +156,30 @@ test('默认角色 = 蓝色大肥鱼（v2 字段，指令块置顶）', () => {
   assert.ok(persona.indexOf('[PERSONA_LOAD]') < persona.indexOf('【身份】'))
   assert.ok(persona.includes('【守则】'))
   assert.ok(persona.includes('【示例对话】'))
+})
+
+test('applyThinkingDirective 思维链指令注入', () => {
+  const directives = { neutral: 'N-DIRECTIVE', role: 'R-DIRECTIVE' }
+  const user = { source: { kind: 'user' }, content: [{ type: 'text', text: '你好' }] }
+  const other = { source: { kind: 'assistant' }, content: [{ type: 'text', text: '在的' }] }
+  const messages = [user, other]
+
+  // 开关关闭：原样返回
+  assert.equal(applyThinkingDirective(messages, EMPTY_STATE, directives), messages)
+  // 开启 + neutral：追加到第一条 user 消息文本末尾
+  const neutral = applyThinkingDirective(messages, { ...EMPTY_STATE, enabled: true, thinkingStyle: 'neutral' }, directives)
+  assert.notEqual(neutral, messages)
+  assert.ok(neutral[0].content[0].text.endsWith('\n\nN-DIRECTIVE'))
+  assert.equal(neutral[1], other) // 非 user 消息不动
+  // 开启 + role
+  const role = applyThinkingDirective(messages, { ...EMPTY_STATE, enabled: true, thinkingStyle: 'role' }, directives)
+  assert.ok(role[0].content[0].text.endsWith('\n\nR-DIRECTIVE'))
+  // 无 user 消息：原样
+  const noUser = [{ source: { kind: 'assistant' }, content: [{ type: 'text', text: 'x' }] }]
+  assert.equal(applyThinkingDirective(noUser, { ...EMPTY_STATE, enabled: true }, directives), noUser)
+  // 末尾非文本块：追加新文本块
+  const weird = [{ source: { kind: 'user' }, content: [{ type: 'image', data: 'x' }] }]
+  const w = applyThinkingDirective(weird, { ...EMPTY_STATE, enabled: true }, directives)
+  assert.equal(w[0].content.length, 2)
+  assert.equal(w[0].content[1].type, 'text')
 })

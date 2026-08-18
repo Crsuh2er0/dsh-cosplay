@@ -212,6 +212,12 @@ window.__ModuleLoader__.load({
         try {
           const text = await file.text()
           const card = fromV2Card(JSON.parse(text))
+          // id 冲突确认：相同 id 默认覆盖；取消则去掉 id 新建（不覆盖）
+          if (card.id && (value?.roles ?? []).some((r) => r.id === card.id)) {
+            if (typeof window !== 'undefined' && !window.confirm(`角色「${card.name}」(id=${card.id}) 已存在。\n确定 = 覆盖现有角色\n取消 = 作为新角色导入`)) {
+              delete card.id
+            }
+          }
           await store.mutate((r) => r.upsertRole(card))
           if (!value?.activeRole) await store.mutate((r) => r.setActiveRole(card.id ?? null))
           if (importFileRef.current) importFileRef.current.value = ''
@@ -380,8 +386,8 @@ window.__ModuleLoader__.load({
           React.createElement(
             'div',
             { style: styles.row },
-            React.createElement('span', { style: styles.label }, '指令块'),
-            React.createElement('textarea', { style: { ...styles.textarea, minHeight: '96px' }, value: form.system_prompt, onChange: (e) => setField('system_prompt', e.target.value), placeholder: '可选：原样注入 persona 顶部的指令块（如 [PERSONA_LOAD] 格式）' }),
+            React.createElement('span', { style: styles.label }, '系统提示词'),
+            React.createElement('textarea', { style: { ...styles.textarea, minHeight: '96px' }, value: form.system_prompt, onChange: (e) => setField('system_prompt', e.target.value), placeholder: '可选：v2 标准 system_prompt 字段，原样注入 persona 顶部（如 [PERSONA_LOAD] 指令块）' }),
           ),
           React.createElement(
             'div',

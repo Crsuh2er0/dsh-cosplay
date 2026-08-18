@@ -140,7 +140,9 @@ export function renderPersona(role) {
  * 渲染当前生效的扮演段落（供 {{cosplay_active}} 变量每次组装时调用）：
  *   - 开关关闭 → 空串（人格静默回退默认）；
  *   - 开关开启但未选角色 → 引导语；
- *   - 开关开启且有激活角色 → 角色卡 persona + 思考风格指令。
+ *   - 开关开启且有激活角色 → 角色卡 persona。
+ * 注：思考风格指令（思维链）不在此渲染——它在 agent/pre-step 阶段注入第一条
+ * user 消息末尾（DeepSeek 思维链指令的训练位，见 docs），persona 只承担角色内容。
  */
 export function renderActivePersona(state) {
   if (!state.enabled) return ''
@@ -148,11 +150,7 @@ export function renderActivePersona(state) {
   if (!active) {
     return 'Cosplay 模式已开启但未选择角色。可用 cosplay_list 查看、cosplay_switch 切换，或在设置页「角色扮演」中激活一个角色；在此之前请保持默认的助手身份与风格。'
   }
-  const styleLine =
-    state.thinkingStyle === 'role'
-      ? '【思考模式】思考过程同样保持角色人设与口吻。'
-      : '【思考模式】思考过程保持中立、专业、分析性；仅在最终回复中扮演角色。'
-  return `${renderPersona(active)}\n${styleLine}`
+  return renderPersona(active)
 }
 
 // ── 酒馆 v2 导入导出映射 ────────────────────────────────────────────────────
@@ -209,6 +207,34 @@ export function fromV2Card(card, state) {
   }
   role.id = typeof ext.id === 'string' && ext.id ? ext.id : nextId(state || EMPTY_STATE, name)
   return role
+}
+
+/**
+ * 思维链指令注入（纯函数）：在模型视图的**第一条 user 消息末尾**追加指令
+ * （DeepSeek 思维链指令的训练位）。未启用、无指令或找不到 user 消息时原样返回。
+ * 仅用于 agent/pre-step 的 enter 替换（不落盘）。
+ * @param messages - 进入步骤的消息列表（UserMessage[] 形态的普通对象）。
+ * @param state - 规整后的角色库状态。
+ * @param directives - { neutral|role: string } 指令文本表。
+ * @returns 替换后的消息列表。
+ */
+export function applyThinkingDirective(messages, state, directives) {
+  if (!Array.isArray(messages) || messages.length === 0) return messages
+  if (!state.enabled) return messages
+  const directive = directives && directives[state.thinkingStyle]
+  if (directive === undefined) return messages
+  const idx = messages.findIndex((m) => m && m.source && m.source.kind === 'user')
+  if (idx < 0) return messages
+  const first = messages[idx]
+  const content = Array.isArray(first.content) ? [...first.content] : []
+  if (content.length === 0) return messages
+  const last = content.length - 1
+  const tail = content[last]
+  const modified =
+    tail && tail.type === 'text'
+      ? { ...first, content: content.map((b, i) => (i === last ? { ...b, text: `${b.text}\n\n${directive}` } : b)) }
+      : { ...first, content: [...content, { type: 'text', text: `\n\n${directive}` }] }
+  return messages.map((m, i) => (i === idx ? modified : m))
 }
 
 /** 工具视图用的角色摘要。 */
