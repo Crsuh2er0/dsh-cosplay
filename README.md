@@ -22,7 +22,9 @@ dsh plugin --profile web add dsh-cosplay
 
 装完重启 dsh 即可。前提：pnpm 在 PATH（Windows 上确保 `pnpm.cmd` 可用）。
 
-> 依赖说明：运行时只需额外装一个 `@deepseek-ai/schemastery`；其余服务包（cordis、dsh-settings、dsh-tools、dsh-system-prompt、dsh-typert-protocol）由 dsh 自带解析，无需单独安装。
+> 版本要求：本插件面向 dsh `0.2.0-rc.2` 及以后的插件 API（设置项即插件 Config 的 volatile 字段），不支持 `0.1.x`。
+>
+> 依赖说明：运行时只需额外装一个 `@deepseek-ai/schemastery`（`^3.18.4`，配置字段的 volatile 支持）；其余服务包（cordis、dsh-settings、dsh-tools、dsh-system-prompt）由 dsh 自带解析，无需单独安装。
 
 ## 使用
 

@@ -2,7 +2,9 @@
 #
 # 形态（Round 3 决策）：全局开关，无独立预设、无预设行。
 # 单个主机行 cosplay-core 完成全部能力：
-#   - settings 命名空间 `cosplay`（开关 + 角色库，$DSH_HOME/settings.yaml）；
+#   - 插件 Config 的 volatile 字段承载状态（开关 + 思考风格 + 激活角色 + 角色库，
+#     默认值即内置角色库）；设置页与工具经 settings 服务写入当前 profile 条目的
+#     user 层，热更新到运行中的实例；
 #   - 全局追加人格段 cosplay-persona + {{cosplay_active}} 变量（每次模型步骤
 #     求值：开关关 → 空串静默回退；开 → 激活角色卡）；
 #   - 全局 cosplay_* 工具（switch 在开关关闭时软禁用，管理工具始终可用）；
